@@ -1,4 +1,4 @@
-name: Website Monitoring
+name: Website Monitor Multiple
 
 on:
   schedule:
@@ -9,6 +9,7 @@ jobs:
   monitor:
     runs-on: ubuntu-latest
     strategy:
+      fail-fast: false    # run all URLs independently
       matrix:
         url: [
           "https://940882164.github.io/portfolio-test-tracker2/",
@@ -20,10 +21,7 @@ jobs:
       - name: Check Website ${{ matrix.url }}
         run: |
           STATUS=$(curl -o /dev/null -s -w "%{http_code}" "${{ matrix.url }}")
-          echo "Checking ${{ matrix.url }} - Status: $STATUS"
           if [ "$STATUS" -ne 200 ]; then
             echo "❌ Website DOWN! ${{ matrix.url }} Status: $STATUS"
             exit 1
-          else
-            echo "✅ Website OK - ${{ matrix.url }}"
           fi
