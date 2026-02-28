@@ -14,8 +14,6 @@ jobs:
         url: [
           "https://940882164.github.io/portfolio-test-tracker2/",
           "https://940882164.github.io/portfolio-test-tracker/",
-          "https://another-site.com",
-          "https://yetanother-site.com"
         ]
     steps:
       - name: Check Website ${{ matrix.url }}
