@@ -1,19 +1,35 @@
-name: Website Monitor
+name: Website Monitor Multiple
 
 on:
   schedule:
-    - cron: "* * * * *"   # every 1 minute
+    - cron: "*/30 * * * *"   # every 30 minutes
   workflow_dispatch:
 
 jobs:
   monitor:
     runs-on: ubuntu-latest
     steps:
-      - name: Check Website Status
+      - name: Check Multiple Websites
         run: |
-          STATUS=$(curl -o /dev/null -s -w "%{http_code}" https://940882164.github.io/portfolio-test-tracker2/)
-          echo "HTTP Status: $STATUS"
-          if [ "$STATUS" -ne 200 ]; then
-            echo "Website DOWN! Status: $STATUS"
+          # List of websites to monitor
+          WEBSITES=(
+            "https://940882164.github.io/portfolio-test-tracker2/"
+            "https://940882164.github.io/portfolio-test-tracker/"
+            "https://another-site.com"
+            "https://yetanother-site.com"
+          )
+
+          FAIL=0
+
+          for URL in "${WEBSITES[@]}"; do
+            STATUS=$(curl -o /dev/null -s -w "%{http_code}" "$URL")
+            echo "$URL Status: $STATUS"
+            if [ "$STATUS" -ne 200 ]; then
+              echo "Website DOWN! $URL Status: $STATUS"
+              FAIL=1
+            fi
+          done
+
+          if [ "$FAIL" -eq 1 ]; then
             exit 1
           fi
