@@ -19,15 +19,12 @@ jobs:
             "https://yetanother-site.com"
           )
 
-          FAIL=0
           FAILED_URLS=""
-
           for URL in "${WEBSITES[@]}"; do
             STATUS=$(curl -o /dev/null -s -w "%{http_code}" "$URL")
             echo "$URL Status: $STATUS"
             if [ "$STATUS" -ne 200 ]; then
               FAILED_URLS="$FAILED_URLS\n$URL (Status: $STATUS)"
-              FAIL=1
             fi
           done
 
@@ -35,18 +32,14 @@ jobs:
           echo -e "$FAILED_URLS" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
 
-          if [ "$FAIL" -eq 1 ]; then
-            exit 1
-          fi
-
-      - name: Send Email on Failure
-        if: failure()
+      - name: Send Email if Any Failures
+        if: ${{ steps.check.outputs.FAILED_URLS != '' }}
         uses: dawidd6/action-send-mail@v3
         with:
           server_address: smtp.gmail.com
           server_port: 465
           username: ${{ secrets.EMAIL_USERNAME }}
-          password: ${{ secrets.EMAIL_PASSWORD }}  # App Password
+          password: ${{ secrets.EMAIL_PASSWORD }}
           subject: "Website Monitor Alert: Some sites failed"
           to: "person1@example.com,person2@example.com,person3@example.com"
           from: "Website Monitor <your-email@gmail.com>"
