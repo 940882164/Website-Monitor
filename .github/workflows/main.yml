@@ -1,4 +1,4 @@
-name: Website Monitor Multiple
+name: Website Monitoring
 
 on:
   schedule:
@@ -8,42 +8,22 @@ on:
 jobs:
   monitor:
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        url: [
+          "https://940882164.github.io/portfolio-test-tracker2/",
+          "https://940882164.github.io/portfolio-test-tracker/",
+          "https://another-site.com",
+          "https://yetanother-site.com"
+        ]
     steps:
-      - name: Check Websites
-        id: check
+      - name: Check Website ${{ matrix.url }}
         run: |
-          WEBSITES=(
-            "https://940882164.github.io/portfolio-test-tracker2/"
-            "https://940882164.github.io/portfolio-test-tracker/"
-            "https://another-site.com"
-            "https://yetanother-site.com"
-          )
-
-          FAILED_URLS=""
-          for URL in "${WEBSITES[@]}"; do
-            STATUS=$(curl -o /dev/null -s -w "%{http_code}" "$URL")
-            echo "$URL Status: $STATUS"
-            if [ "$STATUS" -ne 200 ]; then
-              FAILED_URLS="$FAILED_URLS\n$URL (Status: $STATUS)"
-            fi
-          done
-
-          echo "FAILED_URLS<<EOF" >> $GITHUB_OUTPUT
-          echo -e "$FAILED_URLS" >> $GITHUB_OUTPUT
-          echo "EOF" >> $GITHUB_OUTPUT
-
-      - name: Send Email if Any Failures
-        if: ${{ steps.check.outputs.FAILED_URLS != '' }}
-        uses: dawidd6/action-send-mail@v3
-        with:
-          server_address: smtp.gmail.com
-          server_port: 465
-          username: ${{ secrets.EMAIL_USERNAME }}
-          password: ${{ secrets.EMAIL_PASSWORD }}
-          subject: "Website Monitor Alert: Some sites failed"
-          to: "person1@example.com,person2@example.com,person3@example.com"
-          from: "Website Monitor <your-email@gmail.com>"
-          body: |
-            The following websites failed the last check:
-            ${{ steps.check.outputs.FAILED_URLS }}
-            Check immediately!
+          STATUS=$(curl -o /dev/null -s -w "%{http_code}" "${{ matrix.url }}")
+          echo "Checking ${{ matrix.url }} - Status: $STATUS"
+          if [ "$STATUS" -ne 200 ]; then
+            echo "❌ Website DOWN! ${{ matrix.url }} Status: $STATUS"
+            exit 1
+          else
+            echo "✅ Website OK - ${{ matrix.url }}"
+          fi
