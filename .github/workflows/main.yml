@@ -16,6 +16,7 @@ jobs:
           "http://44.212.11.40:5555/",
           "http://34.231.218.46:5001/",
           "https://labelnow.io/",
+          "http://18.209.227.51:5001/",
         ]
     steps:
       - name: Check Website ${{ matrix.url }}
