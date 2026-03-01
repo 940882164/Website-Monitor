@@ -12,8 +12,10 @@ jobs:
       fail-fast: false    # run all URLs independently
       matrix:
         url: [
-          "https://940882164.github.io/portfolio-test-tracker2/",
-          "https://940882164.github.io/portfolio-test-tracker/",
+          "https://auapp.app/",
+          "http://44.212.11.40:5555/",
+          "http://34.231.218.46:5001/",
+          "https://labelnow.io/",
         ]
     steps:
       - name: Check Website ${{ matrix.url }}
