@@ -2,7 +2,7 @@ name: Website Monitor Multiple
 
 on:
   schedule:
-    - cron: "*/30 * * * *"   # every 30 minutes
+    - cron: "*/59 * * * *"   # every 59 minutes
   workflow_dispatch:
 
 jobs:
@@ -13,10 +13,9 @@ jobs:
       matrix:
         url: [
           "https://auapp.app/",
-          "http://44.212.11.40:5555/",
-          "http://34.231.218.46:5001/",
+          "https://aicc.smf.it.com/",
+          "https://robot.labelnow.io/",
           "https://labelnow.io/",
-          "http://18.209.227.51:5001/",
         ]
     steps:
       - name: Check Website ${{ matrix.url }}
