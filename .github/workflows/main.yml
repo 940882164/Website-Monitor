@@ -2,17 +2,17 @@ name: Website Uptime Email Logger
 
 on:
   schedule:
-    - cron: "*/30 * * * *"   # every 30 minutes
+    - cron: "*/30 * * * *"
   workflow_dispatch:
 
 permissions:
   contents: write
 
-jobs:
-  log-uptime:
+jobs:                   # MUST EXIST
+  log-uptime:           # job name
     runs-on: ubuntu-latest
 
-    steps:
+    steps:              # steps MUST be under the job
       - name: Checkout repo
         uses: actions/checkout@v3
 
@@ -30,7 +30,7 @@ jobs:
           TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 
           for URL in "${WEBSITES[@]}"; do
-            START=$(date +%s%3N)   # milliseconds
+            START=$(date +%s%3N)
             HTTP_STATUS=$(curl -o /dev/null -s -w "%{http_code}" "$URL")
             END=$(date +%s%3N)
             DURATION=$((END-START))
@@ -48,6 +48,7 @@ $URL = $STATE | Checked in $DURATION ms"
           echo "STATUS_REPORT<<EOF" >> $GITHUB_OUTPUT
           echo -e "$STATUS_REPORT" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
+          echo "TIMESTAMP=$TIMESTAMP" >> $GITHUB_OUTPUT
 
       - name: Send Email Report
         uses: dawidd6/action-send-mail@v3
