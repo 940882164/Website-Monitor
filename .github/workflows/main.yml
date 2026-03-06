@@ -1,21 +1,22 @@
-name: Website Uptime Monitor + Notification
+name: Website Uptime Monitor + Email on Down
 
 on:
   schedule:
-    - cron: "*/30 * * * *"   # every 30 minutes
+    - cron: "*/30 * * * *"    # every 30 minutes
   workflow_dispatch:
 
 jobs:
-  check-and-log:
+  monitor:
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4   # updated version
+        uses: actions/checkout@v4
 
-      - name: Install jq (if needed)
+      - name: Install jq
         run: sudo apt-get update && sudo apt-get install -y jq
 
-      - name: Check websites & append log
+      - name: Check websites & build log
         id: check
         run: |
           WEBSITES=(
@@ -28,13 +29,13 @@ jobs:
           TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
           LOG_FILE="uptime-log.json"
 
-          # Initialize if missing
+          # Create empty array if file doesn't exist
           if [ ! -f "$LOG_FILE" ]; then
             echo "[]" > "$LOG_FILE"
           fi
 
           FAILED_SITES=()
-          ALL_STATUS=""
+          STATUS_LINES=""
 
           for SITE in "${WEBSITES[@]}"; do
             START=$(date +%s%3N)
@@ -46,20 +47,23 @@ jobs:
               STATE="UP"
             else
               STATE="DOWN"
-              FAILED_SITES+=("$SITE → $STATE (HTTP $HTTP_STATUS, ${DURATION}ms)")
+              FAILED_SITES+=("$SITE → DOWN (HTTP $HTTP_STATUS, ${DURATION}ms)")
             fi
 
-            ALL_STATUS="$ALL_STATUS\n$SITE → $STATE (HTTP $HTTP_STATUS, ${DURATION}ms)"
+            STATUS_LINES="$STATUS_LINES\n$SITE → $STATE (HTTP $HTTP_STATUS, ${DURATION}ms)"
 
-            # Append to JSON
-            jq --arg site "$SITE" --arg status "$STATE" --arg time "$TIMESTAMP" --argjson duration "$DURATION" \
-              '. += [{"site": $site, "status": $status, "time": $time, "duration_ms": $duration}]' \
-              "$LOG_FILE" > tmp.json && mv tmp.json "$LOG_FILE"
+            # Append entry to JSON log
+            jq --arg site "$SITE" \
+               --arg status "$STATE" \
+               --arg time "$TIMESTAMP" \
+               --argjson duration "$DURATION" \
+               '. += [{"site": $site, "status": $status, "time": $time, "duration_ms": $duration}]' \
+               "$LOG_FILE" > tmp.json && mv tmp.json "$LOG_FILE"
           done
 
-          # Set outputs
+          # Set step outputs
           echo "all_status<<EOF" >> $GITHUB_OUTPUT
-          echo -e "$ALL_STATUS" >> $GITHUB_OUTPUT
+          echo -e "$STATUS_LINES" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
 
           if [ ${#FAILED_SITES[@]} -gt 0 ]; then
@@ -71,50 +75,39 @@ jobs:
             echo "has_failures=false" >> $GITHUB_OUTPUT
           fi
 
-      - name: Commit & push log (always)
+      - name: Commit and push updated log (always)
         if: always()
         run: |
-          git config user.name  "github-actions[bot]"
+          git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add uptime-log.json
-          git commit -m "Update uptime log ($(date -u +'%Y-%m-%d %H:%M UTC'))" || echo "No changes"
+          git commit -m "Update uptime log - $(date -u +'%Y-%m-%d %H:%M UTC')" || echo "No changes to commit"
           git push
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Notify when any site is DOWN
+      - name: Send email alert if any site is DOWN
         if: always() && steps.check.outputs.has_failures == 'true'
-        run: |
-          echo "Sending notification — some sites are down!"
-          echo "${{ steps.check.outputs.failed_sites }}"
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: smtp.gmail.com
+          server_port: 465
+          username: ${{ secrets.GMAIL_USERNAME }}           # your.email@gmail.com
+          password: ${{ secrets.GMAIL_APP_PASSWORD }}       # 16-character app password
+          subject: "[DOWN ALERT] Website Monitor - $(date -u +'%Y-%m-%d %H:%M UTC')"
+          to: ${{ secrets.GMAIL_USERNAME }}                 # send to yourself (or change to another address)
+          from: Website Uptime Monitor <${{ secrets.GMAIL_USERNAME }}>
+          body: |
+            🚨 ALERT: One or more monitored websites are DOWN! 🚨
 
-          # ────────────────────────────────────────────────
-          #  Pick ONE notification method and fill in secret
-          # ────────────────────────────────────────────────
+            Failed sites:
+            ${{ steps.check.outputs.failed_sites }}
 
-          # Option A: Discord webhook (recommended — easy & free)
-          # curl -H "Content-Type: application/json" \
-          #   -d "{\"content\": \"🚨 **Website DOWN!**\n${{ steps.check.outputs.failed_sites }}\n\n${{ steps.check.outputs.all_status }}\n\nhttps://940882164.github.io/Website-Monitor/\"}" \
-          #   ${{ secrets.DISCORD_WEBHOOK_URL }}
+            Full status from this check:
+            ${{ steps.check.outputs.all_status }}
 
-          # Option B: Telegram bot
-          # curl -s -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage" \
-          #   -d chat_id="${{ secrets.TELEGRAM_CHAT_ID }}" \
-          #   -d text="🚨 DOWN!\n${{ steps.check.outputs.failed_sites }}\n\nCheck: https://940882164.github.io/Website-Monitor/"
+            📊 Dashboard: https://940882164.github.io/Website-Monitor/
+            🔍 Workflow run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
 
-          # Option C: Slack webhook
-          # curl -X POST -H 'Content-type: application/json' \
-          #   --data "{\"text\":\"🚨 Website DOWN!\n${{ steps.check.outputs.failed_sites }}\"}" \
-          #   ${{ secrets.SLACK_WEBHOOK_URL }}
-
-          # Option D: Send email via third-party action (needs external SMTP / API key)
-          # uses: dawidd6/action-send-mail@v3
-          # with:
-          #   server_address: smtp.gmail.com
-          #   server_port: 465
-          #   username: ${{ secrets.EMAIL_USERNAME }}
-          #   password: ${{ secrets.EMAIL_PASSWORD }}
-          #   subject: "[ALERT] Website DOWN"
-          #   to: your@email.com
-          #   from: GitHub Monitoring
-          #   body: "Failed sites:\n${{ steps.check.outputs.failed_sites }}\n\nFull status:\n${{ steps.check.outputs.all_status }}"
+            (Automated check every 30 minutes)
+          content_type: text/plain
