@@ -10,10 +10,10 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repo
+      - name: Checkout repository
         uses: actions/checkout@v3
 
-      - name: Log website uptime
+      - name: Check Websites
         run: |
           WEBSITES=(
             "https://940882164.github.io/portfolio-test-tracker2/"
@@ -25,22 +25,39 @@ jobs:
           TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
           LOG_FILE="uptime-log.json"
 
-          # Create file if not exists
+          # create log file if missing
           if [ ! -f "$LOG_FILE" ]; then
             echo "[]" > "$LOG_FILE"
           fi
 
+          FAIL=0
+          STATUS_REPORT=""
+
           for SITE in "${WEBSITES[@]}"; do
-            STATUS=$(curl -o /dev/null -s -w "%{http_code}" "$SITE")
-            if [ "$STATUS" -eq 200 ]; then
+            START=$(date +%s%3N)
+            HTTP_STATUS=$(curl -o /dev/null -s -w "%{http_code}" "$SITE")
+            END=$(date +%s%3N)
+            DURATION=$((END-START))
+
+            if [ "$HTTP_STATUS" = "200" ]; then
               STATE="UP"
             else
               STATE="DOWN"
+              FAIL=1
             fi
 
-            # Append new entry
-            TMP=$(mktemp)
-            jq ". + [{\"site\":\"$SITE\",\"status\":\"$STATE\",\"time\":\"$TIMESTAMP\"}]" "$LOG_FILE" > "$TMP" && mv "$TMP" "$LOG_FILE"
+            STATUS_REPORT="$STATUS_REPORT
+$SITE = $STATE | Checked in $DURATION ms"
 
-            echo "$SITE status: $STATE"
+            # Append log entry for dashboard
+            TMP=$(mktemp)
+            jq ". + [{\"site\":\"$SITE\",\"status\":\"$STATE\",\"time\":\"$TIMESTAMP\",\"duration_ms\":$DURATION}]" "$LOG_FILE" > "$TMP" && mv "$TMP" "$LOG_FILE"
           done
+
+          echo "$STATUS_REPORT"
+
+          # Fail workflow if any site is DOWN to trigger GitHub email
+          if [ $FAIL -eq 1 ]; then
+            echo "One or more websites are DOWN!"
+            exit 1
+          fi
