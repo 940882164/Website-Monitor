@@ -45,16 +45,14 @@ jobs:
             else
               STATE="DOWN"
               FAIL=1
-              FAILED_SITES="$FAILED_SITES
-$SITE = $STATE | Checked in $DURATION ms"
+              FAILED_SITES="$FAILED_SITES"$'\n'"$SITE = $STATE | Checked in ${DURATION} ms"
             fi
 
-            STATUS_REPORT="$STATUS_REPORT
-$SITE = $STATE | Checked in $DURATION ms"
+            STATUS_REPORT="$STATUS_REPORT"$'\n'"$SITE = $STATE | Checked in ${DURATION} ms"
 
             # Append log entry for dashboard
-            TMP=$(mktemp)
-            jq ". + [{\"site\":\"$SITE\",\"status\":\"$STATE\",\"time\":\"$TIMESTAMP\",\"duration_ms\":$DURATION}]" "$LOG_FILE" > "$TMP" && mv "$TMP" "$LOG_FILE"
+            TMP_FILE=$(mktemp)
+            jq ". + [{\"site\":\"$SITE\",\"status\":\"$STATE\",\"time\":\"$TIMESTAMP\",\"duration_ms\":$DURATION}]" "$LOG_FILE" > "$TMP_FILE" && mv "$TMP_FILE" "$LOG_FILE"
           done
 
           echo "=== STATUS REPORT ==="
