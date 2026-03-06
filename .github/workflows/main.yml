@@ -19,8 +19,6 @@ jobs:
           WEBSITES=(
             "https://940882164.github.io/portfolio-test-tracker2/"
             "https://940882164.github.io/portfolio-test-tracker/"
-            "https://another-site.com"
-            "https://yetanother-site.com"
           )
 
           # Get current timestamp
