@@ -24,7 +24,7 @@ h1{
   background:#1e293b;
   padding:20px;
   border-radius:10px;
-  width:250px;
+  width:350px;
   box-shadow:0 0 10px rgba(0,0,0,0.5);
 }
 .up{color:#22c55e;font-weight:bold;}
@@ -34,39 +34,27 @@ h1{
 
 <body>
 
-<h1>Website Monitoring (Last 24 Hours)</h1>
+<h1>Website Monitoring Dashboard (Last 24 Hours)</h1>
 
-<div class="container">
-  <div class="card">
-    <h3>Site 1</h3>
-    <p id="site1">Loading...</p>
-  </div>
-  <div class="card">
-    <h3>Site 2</h3>
-    <p id="site2">Loading...</p>
-  </div>
-  <div class="card">
-    <h3>Site 3</h3>
-    <p id="site3">Loading...</p>
-  </div>
-  <div class="card">
-    <h3>Site 4</h3>
-    <p id="site4">Loading...</p>
-  </div>
+<div class="container" id="dashboard">
+  Loading...
 </div>
 
 <script>
+const sites = [
+  "https://940882164.github.io/portfolio-test-tracker2/",
+  "https://robot.labelnow.io/",
+  "https://aicc.smf.it.com/",
+  "https://labelnow.io/"
+];
+
 fetch("uptime-log.json")
 .then(response => response.json())
 .then(data => {
-  const sites = [
-    "https://940882164.github.io/portfolio-test-tracker2/",
-    "https://940882164.github.io/portfolio-test-tracker/",
-    "https://example.com",
-    "https://google.com"
-  ];
 
-  sites.forEach((url, i) => {
+  let results = [];
+
+  sites.forEach(url => {
     let total = 0;
     let up = 0;
     let lastStatus = "DOWN";
@@ -79,9 +67,25 @@ fetch("uptime-log.json")
       }
     });
 
-    const uptimePercent = total > 0 ? ((up / total) * 100).toFixed(2) : "0.00";
-    const el = document.getElementById("site"+(i+1));
-    el.innerHTML = `<span class="${lastStatus.toLowerCase()}">${lastStatus}</span> | Uptime: ${uptimePercent}% (${up}/${total})`;
+    let uptimePercent = total > 0 ? ((up/total)*100).toFixed(2) : 0;
+    results.push({url, lastStatus, uptimePercent, up, total});
+  });
+
+  // Sort by highest uptime first
+  results.sort((a,b) => b.uptimePercent - a.uptimePercent);
+
+  // Render
+  const container = document.getElementById("dashboard");
+  container.innerHTML = "";
+
+  results.forEach(r => {
+    let card = document.createElement("div");
+    card.className = "card";
+    card.innerHTML = `
+      <h3>${r.url}</h3>
+      <p><span class="${r.lastStatus.toLowerCase()}">${r.lastStatus}</span> | Uptime: ${r.uptimePercent}% (${r.up}/${r.total})</p>
+    `;
+    container.appendChild(card);
   });
 });
 </script>
