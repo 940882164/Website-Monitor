@@ -15,7 +15,7 @@ jobs:
           "https://auapp.app/",
           "https://aicc.smf.it.com/",
           "https://robot.labelnow.io/",
-          "https://labelnow.io/",
+          "https://940882164.github.io/portfolio-test-tracker2/",
         ]
     steps:
       - name: Check Website ${{ matrix.url }}
