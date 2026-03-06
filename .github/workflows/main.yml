@@ -2,18 +2,18 @@ name: Website Uptime Email Logger
 
 on:
   schedule:
-    - cron: "*/30 * * * *"
+    - cron: "*/30 * * * *"  # every 30 minutes
   workflow_dispatch:
 
 permissions:
   contents: write
 
-jobs:                   # MUST EXIST
-  log-uptime:           # job name
+jobs:
+  log-uptime:
     runs-on: ubuntu-latest
 
-    steps:              # steps MUST be under the job
-      - name: Checkout repo
+    steps:
+      - name: Checkout repository
         uses: actions/checkout@v3
 
       - name: Check Websites
