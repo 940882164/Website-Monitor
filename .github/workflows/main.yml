@@ -2,29 +2,88 @@ name: Website Monitor Multiple
 
 on:
   schedule:
-    - cron: "*/30 * * * *"   # every 30 minutes (change back to */59 if preferred)
+    - cron: "*/30 * * * *"   # every 30 minutes
   workflow_dispatch:
 
 jobs:
-  monitor:
+  monitor-and-log:
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false          # Continue checking all URLs even if one fails
-      matrix:
-        url: [
-          "https://940882164.github.io/portfolio-test-tracker2/",
-          "https://robot.labelnow.io/",
-          "https://aicc.smf.it.com/",
-          "https://labelnow.io/"
-        ]
+
     steps:
-      - name: Check Website ${{ matrix.url }}
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install jq
+        run: sudo apt-get update && sudo apt-get install -y jq
+
+      - name: Check all websites & log results
+        id: check
         run: |
-          STATUS=$(curl -s -o /dev/null -w "%{http_code}" --max-time 15 --retry 1 "${{ matrix.url }}") || STATUS="000"
-          echo "Checking ${{ matrix.url }} → HTTP $STATUS"
-          if [ "$STATUS" -ne 200 ]; then
-            echo "❌ Website DOWN! ${{ matrix.url }} Status: $STATUS"
-            exit 1
-          else
-            echo "✅ Website UP! ${{ matrix.url }} Status: $STATUS"
+          WEBSITES=(
+            "https://940882164.github.io/portfolio-test-tracker2/"
+            "https://robot.labelnow.io/"
+            "https://aicc.smf.it.com/"
+            "https://labelnow.io/"
+          )
+
+          TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+          LOG_FILE="uptime-log.json"
+
+          if [ ! -f "$LOG_FILE" ]; then
+            echo "[]" > "$LOG_FILE"
           fi
+
+          FAILED_SITES=""
+          ANY_DOWN=false
+
+          for SITE in "${WEBSITES[@]}"; do
+            START=$(date +%s%3N)
+            HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" --max-time 15 --retry 1 "$SITE") || HTTP_STATUS="000"
+            END=$(date +%s%3N)
+            DURATION=$((END - START))
+
+            if [ "$HTTP_STATUS" = "200" ]; then
+              STATE="UP"
+              echo "✅ $SITE → UP (HTTP $HTTP_STATUS, ${DURATION}ms)"
+            else
+              STATE="DOWN"
+              ANY_DOWN=true
+              FAILED_SITES="$FAILED_SITES\n$SITE → DOWN (HTTP $HTTP_STATUS, ${DURATION}ms)"
+              echo "❌ $SITE → DOWN (HTTP $HTTP_STATUS, ${DURATION}ms)"
+            fi
+
+            # Append to JSON
+            jq --arg site "$SITE" \
+               --arg status "$STATE" \
+               --arg time "$TIMESTAMP" \
+               --argjson duration "$DURATION" \
+               '. += [{"site": $site, "status": $status, "time": $time, "duration_ms": $duration}]' \
+               "$LOG_FILE" > tmp.json && mv tmp.json "$LOG_FILE"
+          done
+
+          # Set output for potential use (visible in logs)
+          echo "failed_sites<<EOF" >> $GITHUB_OUTPUT
+          echo -e "$FAILED_SITES" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+          # Force failure if any DOWN → triggers built-in email
+          if [ "$ANY_DOWN" = true ]; then
+            echo ""
+            echo "======================================"
+            echo "SOME SITES DOWN - SEE DETAILS ABOVE"
+            echo "$FAILED_SITES"
+            echo "Dashboard: https://940882164.github.io/Website-Monitor/"
+            echo "======================================"
+            exit 1
+          fi
+
+      - name: Commit and push log (always runs, even after failure)
+        if: always()
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add uptime-log.json
+          git commit -m "Update uptime log ($(date -u +'%Y-%m-%d %H:%M UTC'))" || echo "No changes to commit"
+          git push
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
