@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Website Monitoring Dashboard</title>
+
+<style>
+body{
+font-family: Arial;
+background:#111;
+color:white;
+text-align:center;
+}
+
+.container{
+display:flex;
+justify-content:center;
+gap:30px;
+margin-top:50px;
+}
+
+.card{
+background:#1f1f1f;
+padding:20px;
+border-radius:10px;
+width:220px;
+}
+
+.up{
+color:lime;
+font-size:22px;
+}
+
+.down{
+color:red;
+font-size:22px;
+}
+
+h2{
+margin-bottom:10px;
+}
+</style>
+
+</head>
+
+<body>
+
+<h1>Website Monitoring (Last 24 Hours)</h1>
+
+<div class="container">
+
+<div class="card">
+<h2>Site 1</h2>
+<div id="site1"></div>
+</div>
+
+<div class="card">
+<h2>Site 2</h2>
+<div id="site2"></div>
+</div>
+
+<div class="card">
+<h2>Site 3</h2>
+<div id="site3"></div>
+</div>
+
+<div class="card">
+<h2>Site 4</h2>
+<div id="site4"></div>
+</div>
+
+</div>
+
+<script>
+
+fetch('uptime-log.json')
+.then(response => response.json())
+.then(data => {
+
+let logs=data.slice(-288); // 24 hours (5 min interval)
+
+function calculate(site){
+
+let up=0;
+let down=0;
+
+logs.forEach(entry=>{
+if(entry[site]=="UP"){up++;}
+else{down++;}
+});
+
+let uptime=(up/(up+down)*100).toFixed(2);
+let downtime=(down/(up+down)*100).toFixed(2);
+
+return `
+<div class="up">UP: ${uptime}%</div>
+<div class="down">DOWN: ${downtime}%</div>
+`;
+
+}
+
+document.getElementById("site1").innerHTML=calculate("940882164.github.io/portfolio-test-tracker2/");
+document.getElementById("site2").innerHTML=calculate("940882164.github.io/portfolio-test-tracker/");
+document.getElementById("site3").innerHTML=calculate("another-site.com");
+document.getElementById("site4").innerHTML=calculate("yetanother-site.com");
+
+});
+
+</script>
+
+</body>
+</html>
