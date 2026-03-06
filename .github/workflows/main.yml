@@ -1,4 +1,4 @@
-name: Website Uptime Logger
+name: Website Uptime Logger with Email
 
 on:
   schedule:
@@ -14,6 +14,7 @@ jobs:
         uses: actions/checkout@v3
 
       - name: Check Websites
+        id: check_sites
         run: |
           WEBSITES=(
             "https://940882164.github.io/portfolio-test-tracker2/"
@@ -25,7 +26,6 @@ jobs:
           TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
           LOG_FILE="uptime-log.json"
 
-          # Create file if missing
           if [ ! -f "$LOG_FILE" ]; then
             echo "[]" > "$LOG_FILE"
           fi
@@ -48,17 +48,41 @@ jobs:
 
             STATUS_REPORT="$STATUS_REPORT"$'\n'"$SITE = $STATE | Checked in ${DURATION} ms"
 
-            # Append log entry for dashboard
             TMP_FILE=$(mktemp)
             jq ". + [{\"site\":\"$SITE\",\"status\":\"$STATE\",\"time\":\"$TIMESTAMP\",\"duration_ms\":$DURATION}]" "$LOG_FILE" > "$TMP_FILE" && mv "$TMP_FILE" "$LOG_FILE"
           done
 
-          echo "=== STATUS REPORT ==="
-          echo "$STATUS_REPORT"
+          echo "STATUS_REPORT<<EOF" >> $GITHUB_OUTPUT
+          echo "$STATUS_REPORT" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
 
-          if [ -n "$FAILED_SITES" ]; then
-            echo "=== FAILED SITES ==="
-            echo "$FAILED_SITES"
-          fi
+          echo "FAILED_SITES<<EOF" >> $GITHUB_OUTPUT
+          echo "$FAILED_SITES" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
 
-          # Workflow always passes now (no exit 1)
+      - name: Commit and push uptime log
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add uptime-log.json
+          git commit -m "Update uptime log"
+          git push
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Send Email on Failures
+        if: steps.check_sites.outputs.FAILED_SITES != ''
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: smtp.gmail.com
+          server_port: 465
+          username: ${{ secrets.EMAIL_USERNAME }}
+          password: ${{ secrets.EMAIL_PASSWORD }}  # use your App Password
+          to: "youremail@gmail.com"
+          from: "Website Monitor <youremail@gmail.com>"
+          subject: "Website Uptime Alert: Some sites failed"
+          body: |
+            The following websites are DOWN as of ${{ github.run_started_at }}:
+            ${{ steps.check_sites.outputs.FAILED_SITES }}
+            Full status report:
+            ${{ steps.check_sites.outputs.STATUS_REPORT }}
