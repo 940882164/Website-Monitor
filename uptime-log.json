@@ -1,9 +1,46 @@
 [
-{ "time": "2026-03-06T19:59:58Z", "site": "https://940882164.github.io/portfolio-test-tracker2/", "status": "DOWN" }
-,
-{ "time": "2026-03-06T19:59:58Z", "site": "https://robot.labelnow.io/", "status": "UP" }
-,
-{ "time": "2026-03-06T19:59:58Z", "site": "https://aicc.smf.it.com/", "status": "UP" }
-,
-{ "time": "2026-03-06T19:59:58Z", "site": "https://labelnow.io/", "status": "UP" }
+  {
+    "time": "2026-03-06T19:59:58Z",
+    "site": "https://940882164.github.io/portfolio-test-tracker2/",
+    "status": "DOWN"
+  },
+  {
+    "time": "2026-03-06T19:59:58Z",
+    "site": "https://robot.labelnow.io/",
+    "status": "UP"
+  },
+  {
+    "time": "2026-03-06T19:59:58Z",
+    "site": "https://aicc.smf.it.com/",
+    "status": "UP"
+  },
+  {
+    "time": "2026-03-06T19:59:58Z",
+    "site": "https://labelnow.io/",
+    "status": "UP"
+  },
+  {
+    "site": "https://940882164.github.io/portfolio-test-tracker2/",
+    "status": "DOWN",
+    "time": "2026-03-06T20:38:00Z",
+    "duration_ms": 100
+  },
+  {
+    "site": "https://robot.labelnow.io/",
+    "status": "UP",
+    "time": "2026-03-06T20:38:00Z",
+    "duration_ms": 273
+  },
+  {
+    "site": "https://aicc.smf.it.com/",
+    "status": "UP",
+    "time": "2026-03-06T20:38:00Z",
+    "duration_ms": 535
+  },
+  {
+    "site": "https://labelnow.io/",
+    "status": "UP",
+    "time": "2026-03-06T20:38:00Z",
+    "duration_ms": 190
+  }
 ]
