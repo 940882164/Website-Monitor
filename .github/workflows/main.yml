@@ -1,20 +1,22 @@
-name: Website Uptime Logger with Green Notifications
+name: Website Uptime Monitor + Notification
 
 on:
   schedule:
-    - cron: "*/30 * * * *"  # every 30 minutes
+    - cron: "*/30 * * * *"   # every 30 minutes
   workflow_dispatch:
 
 jobs:
-  log-uptime:
+  check-and-log:
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4   # updated version
 
-      - name: Check Websites
-        id: check_sites
+      - name: Install jq (if needed)
+        run: sudo apt-get update && sudo apt-get install -y jq
+
+      - name: Check websites & append log
+        id: check
         run: |
           WEBSITES=(
             "https://940882164.github.io/portfolio-test-tracker2/"
@@ -26,53 +28,93 @@ jobs:
           TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
           LOG_FILE="uptime-log.json"
 
+          # Initialize if missing
           if [ ! -f "$LOG_FILE" ]; then
             echo "[]" > "$LOG_FILE"
           fi
 
-          STATUS_REPORT=""
-          FAILED_SITES=""
+          FAILED_SITES=()
+          ALL_STATUS=""
 
           for SITE in "${WEBSITES[@]}"; do
             START=$(date +%s%3N)
-            HTTP_STATUS=$(curl -o /dev/null -s -w "%{http_code}" "$SITE")
+            HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" --max-time 15 --retry 1 "$SITE") || HTTP_STATUS="000"
             END=$(date +%s%3N)
-            DURATION=$((END-START))
+            DURATION=$((END - START))
 
             if [ "$HTTP_STATUS" = "200" ]; then
               STATE="UP"
             else
               STATE="DOWN"
-              FAILED_SITES="$FAILED_SITES"$'\n'"$SITE = $STATE | Checked in ${DURATION} ms"
+              FAILED_SITES+=("$SITE → $STATE (HTTP $HTTP_STATUS, ${DURATION}ms)")
             fi
 
-            STATUS_REPORT="$STATUS_REPORT"$'\n'"$SITE = $STATE | Checked in ${DURATION} ms"
+            ALL_STATUS="$ALL_STATUS\n$SITE → $STATE (HTTP $HTTP_STATUS, ${DURATION}ms)"
 
-            TMP_FILE=$(mktemp)
-            jq ". + [{\"site\":\"$SITE\",\"status\":\"$STATE\",\"time\":\"$TIMESTAMP\",\"duration_ms\":$DURATION}]" "$LOG_FILE" > "$TMP_FILE" && mv "$TMP_FILE" "$LOG_FILE"
+            # Append to JSON
+            jq --arg site "$SITE" --arg status "$STATE" --arg time "$TIMESTAMP" --argjson duration "$DURATION" \
+              '. += [{"site": $site, "status": $status, "time": $time, "duration_ms": $duration}]' \
+              "$LOG_FILE" > tmp.json && mv tmp.json "$LOG_FILE"
           done
 
-          echo "STATUS_REPORT<<EOF" >> $GITHUB_OUTPUT
-          echo "$STATUS_REPORT" >> $GITHUB_OUTPUT
+          # Set outputs
+          echo "all_status<<EOF" >> $GITHUB_OUTPUT
+          echo -e "$ALL_STATUS" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
 
-          echo "FAILED_SITES<<EOF" >> $GITHUB_OUTPUT
-          echo "$FAILED_SITES" >> $GITHUB_OUTPUT
-          echo "EOF" >> $GITHUB_OUTPUT
-
-          # Print failed sites for GitHub notification, but do not exit 1
-          if [ -n "$FAILED_SITES" ]; then
-            echo "Some sites are DOWN. See details below:"
-            echo "$FAILED_SITES"
+          if [ ${#FAILED_SITES[@]} -gt 0 ]; then
+            echo "failed_sites<<EOF" >> $GITHUB_OUTPUT
+            printf "%s\n" "${FAILED_SITES[@]}" >> $GITHUB_OUTPUT
+            echo "EOF" >> $GITHUB_OUTPUT
+            echo "has_failures=true" >> $GITHUB_OUTPUT
+          else
+            echo "has_failures=false" >> $GITHUB_OUTPUT
           fi
 
-      - name: Commit and push uptime log
+      - name: Commit & push log (always)
         if: always()
         run: |
-          git config user.name "github-actions[bot]"
+          git config user.name  "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add uptime-log.json
-          git commit -m "Update uptime log" || echo "No changes to commit"
+          git commit -m "Update uptime log ($(date -u +'%Y-%m-%d %H:%M UTC'))" || echo "No changes"
           git push
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Notify when any site is DOWN
+        if: always() && steps.check.outputs.has_failures == 'true'
+        run: |
+          echo "Sending notification — some sites are down!"
+          echo "${{ steps.check.outputs.failed_sites }}"
+
+          # ────────────────────────────────────────────────
+          #  Pick ONE notification method and fill in secret
+          # ────────────────────────────────────────────────
+
+          # Option A: Discord webhook (recommended — easy & free)
+          # curl -H "Content-Type: application/json" \
+          #   -d "{\"content\": \"🚨 **Website DOWN!**\n${{ steps.check.outputs.failed_sites }}\n\n${{ steps.check.outputs.all_status }}\n\nhttps://940882164.github.io/Website-Monitor/\"}" \
+          #   ${{ secrets.DISCORD_WEBHOOK_URL }}
+
+          # Option B: Telegram bot
+          # curl -s -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage" \
+          #   -d chat_id="${{ secrets.TELEGRAM_CHAT_ID }}" \
+          #   -d text="🚨 DOWN!\n${{ steps.check.outputs.failed_sites }}\n\nCheck: https://940882164.github.io/Website-Monitor/"
+
+          # Option C: Slack webhook
+          # curl -X POST -H 'Content-type: application/json' \
+          #   --data "{\"text\":\"🚨 Website DOWN!\n${{ steps.check.outputs.failed_sites }}\"}" \
+          #   ${{ secrets.SLACK_WEBHOOK_URL }}
+
+          # Option D: Send email via third-party action (needs external SMTP / API key)
+          # uses: dawidd6/action-send-mail@v3
+          # with:
+          #   server_address: smtp.gmail.com
+          #   server_port: 465
+          #   username: ${{ secrets.EMAIL_USERNAME }}
+          #   password: ${{ secrets.EMAIL_PASSWORD }}
+          #   subject: "[ALERT] Website DOWN"
+          #   to: your@email.com
+          #   from: GitHub Monitoring
+          #   body: "Failed sites:\n${{ steps.check.outputs.failed_sites }}\n\nFull status:\n${{ steps.check.outputs.all_status }}"
