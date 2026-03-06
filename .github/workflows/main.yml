@@ -11,6 +11,7 @@ jobs:
 
     steps:
       - name: Check websites
+        id: check
         run: |
           WEBSITES=(
             "https://940882164.github.io/portfolio-test-tracker2/"
@@ -19,8 +20,7 @@ jobs:
             "https://github.com"
           )
 
-          echo "Website Status Check"
-          echo "Time: $(date -u)"
+          FAILED=""
 
           for SITE in "${WEBSITES[@]}"; do
             STATUS=$(curl -o /dev/null -s -w "%{http_code}" --max-time 10 "$SITE" || echo 0)
@@ -29,5 +29,30 @@ jobs:
               echo "$SITE → UP"
             else
               echo "$SITE → DOWN"
+              FAILED="$FAILED $SITE"
             fi
           done
+
+          echo "failed_sites=$FAILED" >> $GITHUB_OUTPUT
+
+          if [ -n "$FAILED" ]; then
+            exit 1
+          fi
+
+      - name: Send email if failure
+        if: failure()
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: smtp.gmail.com
+          server_port: 465
+          username: ${{ secrets.EMAIL_USERNAME }}
+          password: ${{ secrets.EMAIL_PASSWORD }}
+          subject: "Website Monitor Alert"
+          to: "youremail@gmail.com"
+          from: "Website Monitor <youremail@gmail.com>"
+          body: |
+            The following websites are DOWN:
+
+            ${{ steps.check.outputs.failed_sites }}
+
+            Please check immediately.
