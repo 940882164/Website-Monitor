@@ -20,7 +20,7 @@ jobs:
         id: check
         run: |
           WEBSITES=(
-            "https://940882164.github.io/portfolio-test-tracker2/"
+            "https://auapp.app/"
             "https://robot.labelnow.io/"
             "https://aicc.smf.it.com/"
             "https://labelnow.io/"
