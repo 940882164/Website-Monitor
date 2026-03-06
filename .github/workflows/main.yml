@@ -12,7 +12,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v3
         with:
-          persist-credentials: false  # we will use GITHUB_TOKEN for push
+          persist-credentials: false  # will use GITHUB_TOKEN for push
 
       - name: Check Website Status
         shell: bash
@@ -51,7 +51,7 @@ jobs:
           TMP=$(mktemp)
           jq '. + [input]' uptime-log.json status.json > "$TMP"
           mv "$TMP" uptime-log.json
-          # Keep only last 48 entries (24 hours, 30-min intervals)
+          # Keep only last 48 entries (24 hours at 30-min intervals)
           TMP2=$(mktemp)
           jq '.[-48:]' uptime-log.json > "$TMP2"
           mv "$TMP2" uptime-log.json
@@ -63,8 +63,14 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add uptime-log.json
-          git commit -m "Update uptime log" || echo "No changes to commit"
+
+          # Align local branch with remote
           git fetch origin main
-          git reset --soft origin/main
+          git checkout -B main origin/main
+
+          # Add log and commit only if there are changes
+          git add uptime-log.json
+          git diff-index --quiet HEAD || git commit -m "Update uptime log"
+
+          # Force push updated main branch
           git push -f https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY} HEAD:main
