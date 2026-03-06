@@ -1,4 +1,4 @@
-name: Website Uptime Logger - GitHub Alerts
+name: Website Uptime Logger with Notifications
 
 on:
   schedule:
@@ -60,11 +60,10 @@ jobs:
           echo "$FAILED_SITES" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
 
-          # Fail the step if any site is down to trigger GitHub notifications
+          # Print failed sites in log (GitHub notifications will pick this up)
           if [ -n "$FAILED_SITES" ]; then
             echo "Some sites are DOWN. See details below:"
             echo "$FAILED_SITES"
-            exit 1
           fi
 
       - name: Commit and push uptime log
@@ -77,3 +76,10 @@ jobs:
           git push
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Trigger failure notification
+        if: steps.check_sites.outputs.FAILED_SITES != ''
+        run: |
+          echo "Triggering notification: Some sites are DOWN"
+          # exit with 1 to mark as failed and send GitHub email
+          exit 1
