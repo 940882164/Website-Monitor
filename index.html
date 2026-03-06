@@ -1,45 +1,35 @@
 <!DOCTYPE html>
 <html>
 <head>
-<title>Website Monitoring Dashboard</title>
-
+<title>Website Monitoring Dashboard (Last 24h)</title>
+<meta http-equiv="refresh" content="300">
 <style>
-body{
-font-family: Arial;
-background:#111;
-color:white;
-text-align:center;
+body {
+  font-family: Arial;
+  background:#0f172a;
+  color:white;
+  text-align:center;
 }
-
+h1{
+  margin-top:30px;
+}
 .container{
-display:flex;
-justify-content:center;
-gap:30px;
-margin-top:50px;
+  display:flex;
+  justify-content:center;
+  gap:20px;
+  flex-wrap:wrap;
+  margin-top:40px;
 }
-
 .card{
-background:#1f1f1f;
-padding:20px;
-border-radius:10px;
-width:220px;
+  background:#1e293b;
+  padding:20px;
+  border-radius:10px;
+  width:250px;
+  box-shadow:0 0 10px rgba(0,0,0,0.5);
 }
-
-.up{
-color:lime;
-font-size:22px;
-}
-
-.down{
-color:red;
-font-size:22px;
-}
-
-h2{
-margin-bottom:10px;
-}
+.up{color:#22c55e;font-weight:bold;}
+.down{color:#ef4444;font-weight:bold;}
 </style>
-
 </head>
 
 <body>
@@ -47,64 +37,53 @@ margin-bottom:10px;
 <h1>Website Monitoring (Last 24 Hours)</h1>
 
 <div class="container">
-
-<div class="card">
-<h2>Site 1</h2>
-<div id="site1"></div>
-</div>
-
-<div class="card">
-<h2>Site 2</h2>
-<div id="site2"></div>
-</div>
-
-<div class="card">
-<h2>Site 3</h2>
-<div id="site3"></div>
-</div>
-
-<div class="card">
-<h2>Site 4</h2>
-<div id="site4"></div>
-</div>
-
+  <div class="card">
+    <h3>Site 1</h3>
+    <p id="site1">Loading...</p>
+  </div>
+  <div class="card">
+    <h3>Site 2</h3>
+    <p id="site2">Loading...</p>
+  </div>
+  <div class="card">
+    <h3>Site 3</h3>
+    <p id="site3">Loading...</p>
+  </div>
+  <div class="card">
+    <h3>Site 4</h3>
+    <p id="site4">Loading...</p>
+  </div>
 </div>
 
 <script>
-
-fetch('uptime-log.json')
+fetch("uptime-log.json")
 .then(response => response.json())
 .then(data => {
+  const sites = [
+    "https://940882164.github.io/portfolio-test-tracker2/",
+    "https://940882164.github.io/portfolio-test-tracker/",
+    "https://example.com",
+    "https://google.com"
+  ];
 
-let logs=data.slice(-288); // 24 hours (5 min interval)
+  sites.forEach((url, i) => {
+    let total = 0;
+    let up = 0;
+    let lastStatus = "DOWN";
 
-function calculate(site){
+    data.forEach(entry => {
+      if(entry.site === url){
+        total++;
+        if(entry.status === "UP") up++;
+        lastStatus = entry.status;
+      }
+    });
 
-let up=0;
-let down=0;
-
-logs.forEach(entry=>{
-if(entry[site]=="UP"){up++;}
-else{down++;}
+    const uptimePercent = total > 0 ? ((up / total) * 100).toFixed(2) : "0.00";
+    const el = document.getElementById("site"+(i+1));
+    el.innerHTML = `<span class="${lastStatus.toLowerCase()}">${lastStatus}</span> | Uptime: ${uptimePercent}% (${up}/${total})`;
+  });
 });
-
-let uptime=(up/(up+down)*100).toFixed(2);
-let downtime=(down/(up+down)*100).toFixed(2);
-
-return `
-<div class="up">UP: ${uptime}%</div>
-<div class="down">DOWN: ${downtime}%</div>
-`;
-
-}
-
-document.getElementById("site1").innerHTML=calculate("940882164.github.io/portfolio-test-tracker2/");
-document.getElementById("site2").innerHTML=calculate("940882164.github.io/portfolio-test-tracker/");
-document.getElementById("site3").innerHTML=calculate("another-site.com");
-document.getElementById("site4").innerHTML=calculate("yetanother-site.com");
-
-});
-
 </script>
 
 </body>
