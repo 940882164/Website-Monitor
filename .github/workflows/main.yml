@@ -1,59 +1,65 @@
-name: Website Monitor
+name: Website Uptime Logger
 
 on:
   schedule:
-    - cron: "*/5 * * * *"
+    - cron: "*/30 * * * *"
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
-  monitor:
+  log-uptime:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Check Website 1
+      - name: Checkout repo
+        uses: actions/checkout@v3
+
+      - name: Check websites and build log
         run: |
-          URL="https://aicc.smf.it.com"
-          STATUS=$(curl -o /dev/null -s -w "%{http_code}" $URL)
+          WEBSITES=(
+            "https://940882164.github.io/portfolio-test-tracker2/"
+            "https://robot.labelnow.io/"
+            "https://aicc.smf.it.com/"
+            "https://labelnow.io/"
+          )
 
-          echo "Website 1 status: $STATUS"
+          TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 
-          if [ "$STATUS" != "200" ]; then
-            echo "Website 1 is DOWN"
-            exit 1
-          fi
+          echo "[" > uptime-log.json
 
-      - name: Check Website 2
+          FIRST=true
+
+          for URL in "${WEBSITES[@]}"
+          do
+            STATUS=$(curl -o /dev/null -s -w "%{http_code}" "$URL")
+
+            if [ "$STATUS" = "200" ]; then
+              STATE="UP"
+            else
+              STATE="DOWN"
+            fi
+
+            if [ "$FIRST" = true ]; then
+              FIRST=false
+            else
+              echo "," >> uptime-log.json
+            fi
+
+            echo "{ \"time\": \"$TIMESTAMP\", \"site\": \"$URL\", \"status\": \"$STATE\" }" >> uptime-log.json
+
+            echo "$URL = $STATE"
+          done
+
+          echo "]" >> uptime-log.json
+
+      - name: Commit log
         run: |
-          URL="https://940882164.github.io/portfolio-test-tracker2/"
-          STATUS=$(curl -o /dev/null -s -w "%{http_code}" $URL)
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions@github.com"
 
-          echo "Website 2 status: $STATUS"
-
-          if [ "$STATUS" != "200" ]; then
-            echo "Website 2 is DOWN"
-            exit 1
-          fi
-
-      - name: Check Website 3
-        run: |
-          URL="https://auapp.app/"
-          STATUS=$(curl -o /dev/null -s -w "%{http_code}" $URL)
-
-          echo "Website 3 status: $STATUS"
-
-          if [ "$STATUS" != "200" ]; then
-            echo "Website 3 is DOWN"
-            exit 1
-          fi
-
-      - name: Check Website 4
-        run: |
-          URL="https://robot.labelnow.io/"
-          STATUS=$(curl -o /dev/null -s -w "%{http_code}" $URL)
-
-          echo "Website 4 status: $STATUS"
-
-          if [ "$STATUS" != "200" ]; then
-            echo "Website 4 is DOWN"
-            exit 1
-          fi
+          git add uptime-log.json
+          git commit -m "Update uptime log" || echo "No changes"
+          git pull --rebase origin main
+          git push
