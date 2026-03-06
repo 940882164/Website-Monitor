@@ -13,20 +13,23 @@ jobs:
         uses: actions/checkout@v3
 
       - name: Check Website Status
-        shell: bash  # <--- important
+        shell: bash
         run: |
+          # List of websites to monitor (full URLs)
           WEBSITES=(
-            "940882164.github.io/portfolio-test-tracker2/"
-            "940882164.github.io/portfolio-test-tracker/"
-            "another-site.com"
-            "yetanother-site.com"
+            "https://940882164.github.io/portfolio-test-tracker2/"
+            "https://940882164.github.io/portfolio-test-tracker/"
+            "https://another-site.com"
+            "https://yetanother-site.com"
           )
 
+          # Get current timestamp
           TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
           echo "{ \"time\": \"$TIMESTAMP\"" > status.json
 
+          # Check each website
           for SITE in "${WEBSITES[@]}"; do
-            STATUS=$(curl -o /dev/null -s -w "%{http_code}" "https://$SITE")
+            STATUS=$(curl -o /dev/null -s -w "%{http_code}" "$SITE")
             if [ "$STATUS" -eq 200 ]; then
               STATUS_TEXT="UP"
             else
@@ -34,6 +37,7 @@ jobs:
             fi
             echo ", \"$SITE\": \"$STATUS_TEXT\"" >> status.json
           done
+
           echo "}" >> status.json
 
       - name: Merge with existing log
