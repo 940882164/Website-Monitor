@@ -1,51 +1,45 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="bg-gray-950 text-gray-100">
 <head>
   <meta charset="UTF-8">
-  <title>Website Monitoring Dashboard (Last 24h)</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Website Uptime Dashboard • Last 24h</title>
   <meta http-equiv="refresh" content="300">
-  <style>
-    body {
-      font-family: Arial, sans-serif;
-      background: #0f172a;
-      color: white;
-      text-align: center;
-      margin: 0;
-      padding: 20px;
+
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            up: '#22c55e',
+            down: '#ef4444',
+          }
+        }
+      }
     }
-    h1 {
-      margin: 30px 0;
-      color: #e2e8f0;
-    }
-    .container {
-      display: flex;
-      justify-content: center;
-      gap: 24px;
-      flex-wrap: wrap;
-      max-width: 1400px;
-      margin: 0 auto;
-    }
-    .card {
-      background: #1e293b;
-      padding: 24px;
-      border-radius: 12px;
-      width: 340px;
-      box-shadow: 0 4px 15px rgba(0,0,0,0.4);
-      transition: transform 0.15s;
-    }
-    .card:hover {
-      transform: translateY(-4px);
-    }
-    .up { color: #22c55e; font-weight: bold; font-size: 1.2em; }
-    .down { color: #ef4444; font-weight: bold; font-size: 1.2em; }
-    p { margin: 12px 0; font-size: 1.05em; }
-    .small { color: #94a3b8; font-size: 0.9em; }
-  </style>
+  </script>
+
+  <!-- Chart.js CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
-<body>
-  <h1>Website Monitoring Dashboard — Last 24 Hours</h1>
-  <div class="container" id="dashboard">
-    <p>Loading data...</p>
+<body class="min-h-screen bg-gradient-to-br from-gray-950 via-slate-950 to-gray-900 p-6 font-sans">
+  <div class="max-w-7xl mx-auto">
+    <header class="text-center mb-10">
+      <h1 class="text-4xl md:text-5xl font-bold tracking-tight mb-2">
+        Website Uptime Dashboard
+      </h1>
+      <p class="text-gray-400 text-lg">Last 24 Hours • Auto-refreshes every 5 min</p>
+    </header>
+
+    <div id="dashboard" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <!-- Cards will be inserted here -->
+      <div class="col-span-full text-center py-12 text-gray-500 text-xl animate-pulse">
+        Loading dashboard...
+      </div>
+    </div>
   </div>
 
   <script>
@@ -56,55 +50,126 @@
       "https://labelnow.io/"
     ];
 
-    fetch("uptime-log.json?nocache=" + Date.now())
-      .then(r => r.json())
+    // Cache busting + fetch
+    fetch("uptime-log.json?_=" + Date.now())
+      .then(r => {
+        if (!r.ok) throw new Error("Failed to load uptime-log.json");
+        return r.json();
+      })
       .then(data => {
         const now = Date.now();
         const dayAgo = now - 24 * 60 * 60 * 1000;
 
-        // Filter last 24h
+        // Filter last 24h entries
         const recent = data.filter(e => {
           const t = new Date(e.time).getTime();
           return t >= dayAgo && t <= now;
         });
 
-        let results = [];
-
-        sites.forEach(url => {
-          let entries = recent.filter(e => e.site === url);
-          let total = entries.length;
-          let up = entries.filter(e => e.status === "UP").length;
-          let last = entries.length > 0 ? entries[entries.length-1].status : "UNKNOWN";
-
-          let percent = total > 0 ? ((up / total) * 100).toFixed(1) : 0;
-
-          results.push({ url, lastStatus: last, uptimePercent: percent, up, total });
-        });
-
-        // Sort best → worst
-        results.sort((a, b) => b.uptimePercent - a.uptimePercent);
-
         const container = document.getElementById("dashboard");
-        container.innerHTML = "";
+        container.innerHTML = ""; // clear loading
 
-        if (results.length === 0) {
-          container.innerHTML = "<p>No data in the last 24 hours yet.</p>";
+        if (recent.length === 0) {
+          container.innerHTML = `<p class="col-span-full text-center py-12 text-gray-400 text-xl">No data in the last 24 hours yet.</p>`;
           return;
         }
 
-        results.forEach(r => {
-          let card = document.createElement("div");
-          card.className = "card";
-          card.innerHTML = `
-            <h3 style="margin:0 0 12px 0; word-break:break-all;">${r.url.replace("https://", "")}</h3>
-            <p><span class="${r.lastStatus.toLowerCase()}">${r.lastStatus}</span></p>
-            <p>Uptime: <strong>${r.uptimePercent}%</strong> <span class="small">(${r.up} / ${r.total} checks)</span></p>
+        // Group by site
+        sites.forEach(url => {
+          const entries = recent.filter(e => e.site === url);
+          const total = entries.length;
+          const upCount = entries.filter(e => e.status === "UP").length;
+          const uptime = total > 0 ? (upCount / total) * 100 : 0;
+          const lastStatus = entries.length > 0 ? entries[entries.length - 1].status : "UNKNOWN";
+
+          // Prepare chart data: time series of UP(1)/DOWN(0)
+          const labels = entries.map(e => new Date(e.time).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}));
+          const statusData = entries.map(e => e.status === "UP" ? 1 : 0);
+
+          const card = document.createElement("div");
+          card.className = `
+            bg-gray-800/60 backdrop-blur-sm border border-gray-700/50 rounded-2xl p-6 shadow-xl
+            hover:shadow-2xl hover:scale-[1.02] transition-all duration-300
           `;
+
+          card.innerHTML = `
+            <h3 class="text-lg font-semibold mb-4 truncate" title="${url}">
+              ${url.replace('https://', '').replace('www.', '')}
+            </h3>
+
+            <!-- Status & Uptime Ring -->
+            <div class="flex items-center justify-between mb-5">
+              <div class="text-center">
+                <div class="relative inline-block w-24 h-24">
+                  <svg class="w-full h-full -rotate-90" viewBox="0 0 120 120">
+                    <circle cx="60" cy="60" r="54" fill="none" stroke="#1f2937" stroke-width="12"/>
+                    <circle cx="60" cy="60" r="54" fill="none" stroke="${lastStatus === 'UP' ? '#22c55e' : '#ef4444'}"
+                      stroke-width="12" stroke-dasharray="339" stroke-dashoffset="${339 * (1 - uptime/100)}"
+                      stroke-linecap="round" class="transition-all duration-1000"/>
+                  </svg>
+                  <div class="absolute inset-0 flex items-center justify-center text-2xl font-bold">
+                    ${uptime.toFixed(0)}<span class="text-base font-normal opacity-80">%</span>
+                  </div>
+                </div>
+                <p class="text-sm mt-2 text-gray-400">Uptime</p>
+              </div>
+
+              <div class="text-center">
+                <div class="text-4xl font-bold ${lastStatus === 'UP' ? 'text-up' : 'text-down'}">
+                  ${lastStatus}
+                </div>
+                <p class="text-xs text-gray-500 mt-1">Last check</p>
+              </div>
+            </div>
+
+            <!-- Mini chart -->
+            <div class="h-20 mb-4">
+              <canvas id="chart-${url.replace(/[^a-zA-Z0-9]/g,'')}"></canvas>
+            </div>
+
+            <p class="text-sm text-gray-400 text-center">
+              ${upCount} / ${total} checks • Avg response: ~${Math.round(entries.reduce((a,e)=>a+(e.duration_ms||0),0)/total)||'—'} ms
+            </p>
+          `;
+
           container.appendChild(card);
+
+          // Create mini chart
+          const ctx = document.getElementById(`chart-${url.replace(/[^a-zA-Z0-9]/g,'')}`).getContext('2d');
+          new Chart(ctx, {
+            type: 'line',
+            data: {
+              labels: labels.length ? labels : ['No data'],
+              datasets: [{
+                label: 'Status (1=UP, 0=DOWN)',
+                data: statusData.length ? statusData : [0],
+                borderColor: lastStatus === 'UP' ? '#22c55e' : '#ef4444',
+                backgroundColor: lastStatus === 'UP' ? 'rgba(34,197,94,0.2)' : 'rgba(239,68,68,0.2)',
+                fill: true,
+                tension: 0.1,
+                pointRadius: 0,
+                borderWidth: 2
+              }]
+            },
+            options: {
+              responsive: true,
+              maintainAspectRatio: false,
+              plugins: { legend: { display: false } },
+              scales: {
+                x: { display: false },
+                y: { min: 0, max: 1, display: false }
+              },
+              elements: { line: { tension: 0 } }
+            }
+          });
         });
       })
       .catch(err => {
-        document.getElementById("dashboard").innerHTML = "<p style='color:#ef4444'>Cannot load uptime-log.json</p>";
+        document.getElementById("dashboard").innerHTML = `
+          <p class="col-span-full text-center py-12 text-red-400 text-xl">
+            Error loading data: ${err.message}
+          </p>
+        `;
         console.error(err);
       });
   </script>
