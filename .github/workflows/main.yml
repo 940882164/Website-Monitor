@@ -1,109 +1,30 @@
-name: Website Uptime Monitor + Email on Down
+name: Website Monitor Multiple
 
 on:
   schedule:
-    - cron: "*/30 * * * *"
+    - cron: "*/30 * * * *"   # every 30 minutes (change back to */59 if preferred)
   workflow_dispatch:
 
 jobs:
   monitor:
     runs-on: ubuntu-latest
-
+    strategy:
+      fail-fast: false          # Continue checking all URLs even if one fails
+      matrix:
+        url: [
+          "https://940882164.github.io/portfolio-test-tracker2/",
+          "https://robot.labelnow.io/",
+          "https://aicc.smf.it.com/",
+          "https://labelnow.io/"
+        ]
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Install jq
-        run: sudo apt-get update && sudo apt-get install -y jq
-
-      - name: Check websites & build log
-        id: check
+      - name: Check Website ${{ matrix.url }}
         run: |
-          WEBSITES=(
-            "https://940882164.github.io/portfolio-test-tracker2/"
-            "https://robot.labelnow.io/"
-            "https://aicc.smf.it.com/"
-            "https://labelnow.io/"
-          )
-
-          TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
-          LOG_FILE="uptime-log.json"
-
-          if [ ! -f "$LOG_FILE" ]; then
-            echo "[]" > "$LOG_FILE"
-          fi
-
-          FAILED_SITES=()
-          STATUS_LINES=""
-
-          for SITE in "${WEBSITES[@]}"; do
-            START=$(date +%s%3N)
-            HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" --max-time 15 --retry 1 "$SITE") || HTTP_STATUS="000"
-            END=$(date +%s%3N)
-            DURATION=$((END - START))
-
-            if [ "$HTTP_STATUS" = "200" ]; then
-              STATE="UP"
-            else
-              STATE="DOWN"
-              FAILED_SITES+=("$SITE (HTTP $HTTP_STATUS, ${DURATION}ms)")
-            fi
-
-            STATUS_LINES="$STATUS_LINES\n$SITE → $STATE (HTTP $HTTP_STATUS, ${DURATION}ms)"
-
-            jq --arg site "$SITE" \
-               --arg status "$STATE" \
-               --arg time "$TIMESTAMP" \
-               --argjson duration "$DURATION" \
-               '. += [{"site": $site, "status": $status, "time": $time, "duration_ms": $duration}]' \
-               "$LOG_FILE" > tmp.json && mv tmp.json "$LOG_FILE"
-          done
-
-          echo "Status this run:"
-          echo -e "$STATUS_LINES"
-
-          if [ ${#FAILED_SITES[@]} -gt 0 ]; then
-            echo "failed_sites<<EOF" >> $GITHUB_OUTPUT
-            printf "%s\n" "${FAILED_SITES[@]}" >> $GITHUB_OUTPUT
-            echo "EOF" >> $GITHUB_OUTPUT
-            echo "has_failures=true" >> $GITHUB_OUTPUT
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" --max-time 15 --retry 1 "${{ matrix.url }}") || STATUS="000"
+          echo "Checking ${{ matrix.url }} → HTTP $STATUS"
+          if [ "$STATUS" -ne 200 ]; then
+            echo "❌ Website DOWN! ${{ matrix.url }} Status: $STATUS"
+            exit 1
           else
-            echo "has_failures=false" >> $GITHUB_OUTPUT
+            echo "✅ Website UP! ${{ matrix.url }} Status: $STATUS"
           fi
-
-      - name: Commit and push updated log (always)
-        if: always()
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add uptime-log.json
-          git commit -m "Update uptime log - $(date -u +'%Y-%m-%d %H:%M UTC')" || echo "No changes"
-          git push
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Send custom email if any site DOWN
-        if: always() && steps.check.outputs.has_failures == 'true'
-        uses: dawidd6/action-send-mail@v3
-        with:
-          server_address: smtp.gmail.com
-          server_port: 465
-          username: ${{ secrets.GMAIL_ADDRESS }}
-          password: ${{ secrets.GMAIL_APP_PASSWORD }}
-          subject: "Website DOWN: ${{ steps.check.outputs.failed_sites }} - Uptime Monitor"
-          to: ${{ secrets.GMAIL_ADDRESS }}
-          from: Uptime Monitor <${{ secrets.GMAIL_ADDRESS }}>
-          body: |
-            🚨 Site(s) DOWN detected! 🚨
-
-            Failed:
-            ${{ steps.check.outputs.failed_sites }}
-
-            Full status:
-            ${{ steps.check.outputs.all_status }}  # add this output if you want full list
-
-            Dashboard → https://940882164.github.io/Website-Monitor/
-            Run details → $$   {{ github.server_url }}/   $${{ github.repository }}/actions/runs/${{ github.run_id }}
-
-            (Check every 30 min)
-          content_type: text/plain
