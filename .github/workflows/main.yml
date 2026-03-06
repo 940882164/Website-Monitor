@@ -1,8 +1,8 @@
-name: Website Uptime Logger
+name: Website Uptime Email Logger
 
 on:
   schedule:
-    - cron: "*/30 * * * *"
+    - cron: "*/30 * * * *"   # every 30 minutes
   workflow_dispatch:
 
 permissions:
@@ -16,7 +16,8 @@ jobs:
       - name: Checkout repo
         uses: actions/checkout@v3
 
-      - name: Check websites and build log
+      - name: Check Websites
+        id: check
         run: |
           WEBSITES=(
             "https://940882164.github.io/portfolio-test-tracker2/"
@@ -25,41 +26,42 @@ jobs:
             "https://labelnow.io/"
           )
 
+          STATUS_REPORT=""
           TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 
-          echo "[" > uptime-log.json
+          for URL in "${WEBSITES[@]}"; do
+            START=$(date +%s%3N)   # milliseconds
+            HTTP_STATUS=$(curl -o /dev/null -s -w "%{http_code}" "$URL")
+            END=$(date +%s%3N)
+            DURATION=$((END-START))
 
-          FIRST=true
-
-          for URL in "${WEBSITES[@]}"
-          do
-            STATUS=$(curl -o /dev/null -s -w "%{http_code}" "$URL")
-
-            if [ "$STATUS" = "200" ]; then
+            if [ "$HTTP_STATUS" = "200" ]; then
               STATE="UP"
             else
               STATE="DOWN"
             fi
 
-            if [ "$FIRST" = true ]; then
-              FIRST=false
-            else
-              echo "," >> uptime-log.json
-            fi
-
-            echo "{ \"time\": \"$TIMESTAMP\", \"site\": \"$URL\", \"status\": \"$STATE\" }" >> uptime-log.json
-
-            echo "$URL = $STATE"
+            STATUS_REPORT="$STATUS_REPORT
+$URL = $STATE | Checked in $DURATION ms"
           done
 
-          echo "]" >> uptime-log.json
+          echo "STATUS_REPORT<<EOF" >> $GITHUB_OUTPUT
+          echo -e "$STATUS_REPORT" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
 
-      - name: Commit log
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions@github.com"
+      - name: Send Email Report
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: smtp.gmail.com
+          server_port: 465
+          username: ${{ secrets.EMAIL_USERNAME }}
+          password: ${{ secrets.EMAIL_PASSWORD }}
+          subject: "Website Uptime Logger - $(date +'%Y-%m-%d %H:%M:%S')"
+          to: "your-email@gmail.com"
+          from: "Website Monitor <your-email@gmail.com>"
+          body: |
+            Website Uptime Check (Every 30 minutes):
+            Timestamp: ${{ steps.check.outputs.TIMESTAMP }}
 
-          git add uptime-log.json
-          git commit -m "Update uptime log" || echo "No changes"
-          git pull --rebase origin main
-          git push
+            Status per website:
+            ${{ steps.check.outputs.STATUS_REPORT }}
