@@ -2,7 +2,7 @@ name: Website Monitor
 
 on:
   schedule:
-    - cron: "*/30 * * * *"
+    - cron: "*/5 * * * *"
   workflow_dispatch:
 
 jobs:
@@ -10,49 +10,50 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Check websites
-        id: check
+      - name: Check Website 1
         run: |
-          WEBSITES=(
-            "https://940882164.github.io/portfolio-test-tracker2/"
-            "https://940882164.github.io/portfolio-test-tracker/"
-            "https://example.com"
-            "https://github.com"
-          )
+          URL="https://aicc.smf.it.com"
+          STATUS=$(curl -o /dev/null -s -w "%{http_code}" $URL)
 
-          FAILED=""
+          echo "Website 1 status: $STATUS"
 
-          for SITE in "${WEBSITES[@]}"; do
-            STATUS=$(curl -o /dev/null -s -w "%{http_code}" --max-time 10 "$SITE" || echo 0)
-
-            if [ "$STATUS" -eq 200 ]; then
-              echo "$SITE → UP"
-            else
-              echo "$SITE → DOWN"
-              FAILED="$FAILED $SITE"
-            fi
-          done
-
-          echo "failed_sites=$FAILED" >> $GITHUB_OUTPUT
-
-          if [ -n "$FAILED" ]; then
+          if [ "$STATUS" != "200" ]; then
+            echo "Website 1 is DOWN"
             exit 1
           fi
 
-      - name: Send email if failure
-        if: failure()
-        uses: dawidd6/action-send-mail@v3
-        with:
-          server_address: smtp.gmail.com
-          server_port: 465
-          username: ${{ secrets.EMAIL_USERNAME }}
-          password: ${{ secrets.EMAIL_PASSWORD }}
-          subject: "Website Monitor Alert"
-          to: "youremail@gmail.com"
-          from: "Website Monitor <youremail@gmail.com>"
-          body: |
-            The following websites are DOWN:
+      - name: Check Website 2
+        run: |
+          URL="https://site2.com"
+          STATUS=$(curl -o /dev/null -s -w "%{http_code}" $URL)
 
-            ${{ steps.check.outputs.failed_sites }}
+          echo "Website 2 status: $STATUS"
 
-            Please check immediately.
+          if [ "$STATUS" != "200" ]; then
+            echo "Website 2 is DOWN"
+            exit 1
+          fi
+
+      - name: Check Website 3
+        run: |
+          URL="https://site3.com"
+          STATUS=$(curl -o /dev/null -s -w "%{http_code}" $URL)
+
+          echo "Website 3 status: $STATUS"
+
+          if [ "$STATUS" != "200" ]; then
+            echo "Website 3 is DOWN"
+            exit 1
+          fi
+
+      - name: Check Website 4
+        run: |
+          URL="https://site4.com"
+          STATUS=$(curl -o /dev/null -s -w "%{http_code}" $URL)
+
+          echo "Website 4 status: $STATUS"
+
+          if [ "$STATUS" != "200" ]; then
+            echo "Website 4 is DOWN"
+            exit 1
+          fi
