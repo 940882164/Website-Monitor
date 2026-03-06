@@ -1,23 +1,19 @@
-name: Website Uptime Email Logger
+name: Website Uptime Logger
 
 on:
   schedule:
     - cron: "*/30 * * * *"  # every 30 minutes
   workflow_dispatch:
 
-permissions:
-  contents: write
-
 jobs:
   log-uptime:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repository
+      - name: Checkout repo
         uses: actions/checkout@v3
 
-      - name: Check Websites
-        id: check
+      - name: Log website uptime
         run: |
           WEBSITES=(
             "https://940882164.github.io/portfolio-test-tracker2/"
@@ -26,43 +22,25 @@ jobs:
             "https://labelnow.io/"
           )
 
-          STATUS_REPORT=""
           TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+          LOG_FILE="uptime-log.json"
 
-          for URL in "${WEBSITES[@]}"; do
-            START=$(date +%s%3N)
-            HTTP_STATUS=$(curl -o /dev/null -s -w "%{http_code}" "$URL")
-            END=$(date +%s%3N)
-            DURATION=$((END-START))
+          # Create file if not exists
+          if [ ! -f "$LOG_FILE" ]; then
+            echo "[]" > "$LOG_FILE"
+          fi
 
-            if [ "$HTTP_STATUS" = "200" ]; then
+          for SITE in "${WEBSITES[@]}"; do
+            STATUS=$(curl -o /dev/null -s -w "%{http_code}" "$SITE")
+            if [ "$STATUS" -eq 200 ]; then
               STATE="UP"
             else
               STATE="DOWN"
             fi
 
-            STATUS_REPORT="$STATUS_REPORT
-$URL = $STATE | Checked in $DURATION ms"
+            # Append new entry
+            TMP=$(mktemp)
+            jq ". + [{\"site\":\"$SITE\",\"status\":\"$STATE\",\"time\":\"$TIMESTAMP\"}]" "$LOG_FILE" > "$TMP" && mv "$TMP" "$LOG_FILE"
+
+            echo "$SITE status: $STATE"
           done
-
-          echo "STATUS_REPORT<<EOF" >> $GITHUB_OUTPUT
-          echo -e "$STATUS_REPORT" >> $GITHUB_OUTPUT
-          echo "EOF" >> $GITHUB_OUTPUT
-          echo "TIMESTAMP=$TIMESTAMP" >> $GITHUB_OUTPUT
-
-      - name: Send Email Report
-        uses: dawidd6/action-send-mail@v3
-        with:
-          server_address: smtp.gmail.com
-          server_port: 465
-          username: ${{ secrets.EMAIL_USERNAME }}
-          password: ${{ secrets.EMAIL_PASSWORD }}
-          subject: "Website Uptime Logger - $(date +'%Y-%m-%d %H:%M:%S')"
-          to: "your-email@gmail.com"
-          from: "Website Monitor <your-email@gmail.com>"
-          body: |
-            Website Uptime Check (Every 30 minutes):
-            Timestamp: ${{ steps.check.outputs.TIMESTAMP }}
-
-            Status per website:
-            ${{ steps.check.outputs.STATUS_REPORT }}
