@@ -1,4 +1,4 @@
-name: Website Uptime Monitor + Email on Down
+name: Website Uptime Monitor + Built-in Notification on Down
 
 on:
   schedule:
@@ -47,7 +47,7 @@ jobs:
               STATE="UP"
             else
               STATE="DOWN"
-              FAILED_SITES+=("$SITE → DOWN (HTTP $HTTP_STATUS, ${DURATION}ms)")
+              FAILED_SITES+=("$SITE (HTTP $HTTP_STATUS, ${DURATION}ms)")
             fi
 
             STATUS_LINES="$STATUS_LINES\n$SITE → $STATE (HTTP $HTTP_STATUS, ${DURATION}ms)"
@@ -61,21 +61,18 @@ jobs:
                "$LOG_FILE" > tmp.json && mv tmp.json "$LOG_FILE"
           done
 
-          # Set step outputs
-          echo "all_status<<EOF" >> $GITHUB_OUTPUT
-          echo -e "$STATUS_LINES" >> $GITHUB_OUTPUT
-          echo "EOF" >> $GITHUB_OUTPUT
+          # Print status for logs (visible in workflow run)
+          echo "Status this run:"
+          echo -e "$STATUS_LINES"
 
+          # If any DOWN → fail the job so built-in email is sent
           if [ ${#FAILED_SITES[@]} -gt 0 ]; then
-            echo "failed_sites<<EOF" >> $GITHUB_OUTPUT
-            printf "%s\n" "${FAILED_SITES[@]}" >> $GITHUB_OUTPUT
-            echo "EOF" >> $GITHUB_OUTPUT
-            echo "has_failures=true" >> $GITHUB_OUTPUT
-          else
-            echo "has_failures=false" >> $GITHUB_OUTPUT
+            echo "ALERT: Some sites DOWN → forcing failure for notification"
+            echo "Failed: ${FAILED_SITES[*]}"
+            exit 1
           fi
 
-      - name: Commit and push updated log (always)
+      - name: Commit and push updated log (always, even on DOWN/failure)
         if: always()
         run: |
           git config user.name "github-actions[bot]"
@@ -85,29 +82,3 @@ jobs:
           git push
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Send email alert if any site is DOWN
-        if: always() && steps.check.outputs.has_failures == 'true'
-        uses: dawidd6/action-send-mail@v3
-        with:
-          server_address: smtp.gmail.com
-          server_port: 465
-          username: ${{ secrets.GMAIL_USERNAME }}           # your.email@gmail.com
-          password: ${{ secrets.GMAIL_APP_PASSWORD }}       # 16-character app password
-          subject: "[DOWN ALERT] Website Monitor - $(date -u +'%Y-%m-%d %H:%M UTC')"
-          to: ${{ secrets.GMAIL_USERNAME }}                 # send to yourself (or change to another address)
-          from: Website Uptime Monitor <${{ secrets.GMAIL_USERNAME }}>
-          body: |
-            🚨 ALERT: One or more monitored websites are DOWN! 🚨
-
-            Failed sites:
-            ${{ steps.check.outputs.failed_sites }}
-
-            Full status from this check:
-            ${{ steps.check.outputs.all_status }}
-
-            📊 Dashboard: https://940882164.github.io/Website-Monitor/
-            🔍 Workflow run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-
-            (Automated check every 30 minutes)
-          content_type: text/plain
