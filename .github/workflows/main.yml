@@ -13,10 +13,17 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout Repository
+      - name: Checkout repository
         uses: actions/checkout@v3
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 0
+
+      - name: Prepare repository
+        run: |
+          git config user.name "github-actions"
+          git config user.email "actions@github.com"
+          git pull origin main
 
       - name: Check Website Status
         run: |
@@ -44,7 +51,7 @@ jobs:
 
           echo "}" >> status.json
 
-      - name: Update Log
+      - name: Update uptime log
         run: |
           if [ ! -f uptime-log.json ]; then
             echo "[]" > uptime-log.json
@@ -53,17 +60,12 @@ jobs:
           jq '. + [input]' uptime-log.json status.json > temp.json
           mv temp.json uptime-log.json
 
-          # keep only last 48 entries (24 hours)
+          # keep last 48 records (24h if run every 30 min)
           jq '.[-48:]' uptime-log.json > temp.json
           mv temp.json uptime-log.json
 
-      - name: Commit and Push
+      - name: Commit and push
         run: |
-          git config user.name "github-actions"
-          git config user.email "actions@github.com"
-
           git add uptime-log.json
-          git commit -m "Update uptime log" || echo "No changes"
-
-          git pull --rebase
-          git push
+          git commit -m "Update uptime log" || echo "No changes to commit"
+          git push origin main
