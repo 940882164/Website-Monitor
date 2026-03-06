@@ -1,27 +1,59 @@
-name: Website Monitor Multiple
+name: Website Uptime Logger
 
 on:
   schedule:
-    - cron: "*/59 * * * *"   # every 59 minutes
+    - cron: "*/30 * * * *"   # every 30 minutes
   workflow_dispatch:
 
 jobs:
-  monitor:
+  log-uptime:
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false    # run all URLs independently
-      matrix:
-        url: [
-          "https://auapp.app/",
-          "https://aicc.smf.it.com/",
-          "https://robot.labelnow.io/",
-          "https://labelnow.io/",
-        ]
     steps:
-      - name: Check Website ${{ matrix.url }}
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Check Website Status
+        id: check
         run: |
-          STATUS=$(curl -o /dev/null -s -w "%{http_code}" "${{ matrix.url }}")
-          if [ "$STATUS" -ne 200 ]; then
-            echo "❌ Website DOWN! ${{ matrix.url }} Status: $STATUS"
-            exit 1
+          WEBSITES=(
+            "940882164.github.io/portfolio-test-tracker2/"
+            "940882164.github.io/portfolio-test-tracker/"
+            "another-site.com"
+            "yetanother-site.com"
+          )
+
+          TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+          echo "{ \"time\": \"$TIMESTAMP\"" > status.json
+
+          for SITE in "${WEBSITES[@]}"; do
+            STATUS=$(curl -o /dev/null -s -w "%{http_code}" "https://$SITE")
+            if [ "$STATUS" -eq 200 ]; then
+              STATUS_TEXT="UP"
+            else
+              STATUS_TEXT="DOWN"
+            fi
+            echo ", \"$SITE\": \"$STATUS_TEXT\"" >> status.json
+          done
+          echo "}" >> status.json
+
+      - name: Merge with existing log
+        id: merge
+        run: |
+          if [ ! -f uptime-log.json ]; then
+            echo "[]" > uptime-log.json
           fi
+          TMP=$(mktemp)
+          jq '. + [input]' uptime-log.json status.json > "$TMP"
+          mv "$TMP" uptime-log.json
+          # Keep only last 48 entries (24 hours for 30-min intervals)
+          TMP2=$(mktemp)
+          jq '.[-48:]' uptime-log.json > "$TMP2"
+          mv "$TMP2" uptime-log.json
+
+      - name: Commit and Push log
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add uptime-log.json
+          git commit -m "Update uptime log"
+          git push
