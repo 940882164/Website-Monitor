@@ -1,94 +1,112 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-<title>Website Monitoring Dashboard (Last 24h)</title>
-<meta http-equiv="refresh" content="300">
-<style>
-body {
-  font-family: Arial;
-  background:#0f172a;
-  color:white;
-  text-align:center;
-}
-h1{
-  margin-top:30px;
-}
-.container{
-  display:flex;
-  justify-content:center;
-  gap:20px;
-  flex-wrap:wrap;
-  margin-top:40px;
-}
-.card{
-  background:#1e293b;
-  padding:20px;
-  border-radius:10px;
-  width:350px;
-  box-shadow:0 0 10px rgba(0,0,0,0.5);
-}
-.up{color:#22c55e;font-weight:bold;}
-.down{color:#ef4444;font-weight:bold;}
-</style>
+  <meta charset="UTF-8">
+  <title>Website Monitoring Dashboard (Last 24h)</title>
+  <meta http-equiv="refresh" content="300">
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #0f172a;
+      color: white;
+      text-align: center;
+      margin: 0;
+      padding: 20px;
+    }
+    h1 {
+      margin: 30px 0;
+      color: #e2e8f0;
+    }
+    .container {
+      display: flex;
+      justify-content: center;
+      gap: 24px;
+      flex-wrap: wrap;
+      max-width: 1400px;
+      margin: 0 auto;
+    }
+    .card {
+      background: #1e293b;
+      padding: 24px;
+      border-radius: 12px;
+      width: 340px;
+      box-shadow: 0 4px 15px rgba(0,0,0,0.4);
+      transition: transform 0.15s;
+    }
+    .card:hover {
+      transform: translateY(-4px);
+    }
+    .up { color: #22c55e; font-weight: bold; font-size: 1.2em; }
+    .down { color: #ef4444; font-weight: bold; font-size: 1.2em; }
+    p { margin: 12px 0; font-size: 1.05em; }
+    .small { color: #94a3b8; font-size: 0.9em; }
+  </style>
 </head>
-
 <body>
+  <h1>Website Monitoring Dashboard — Last 24 Hours</h1>
+  <div class="container" id="dashboard">
+    <p>Loading data...</p>
+  </div>
 
-<h1>Website Monitoring Dashboard (Last 24 Hours)</h1>
+  <script>
+    const sites = [
+      "https://940882164.github.io/portfolio-test-tracker2/",
+      "https://robot.labelnow.io/",
+      "https://aicc.smf.it.com/",
+      "https://labelnow.io/"
+    ];
 
-<div class="container" id="dashboard">
-  Loading...
-</div>
+    fetch("uptime-log.json?nocache=" + Date.now())
+      .then(r => r.json())
+      .then(data => {
+        const now = Date.now();
+        const dayAgo = now - 24 * 60 * 60 * 1000;
 
-<script>
-const sites = [
-  "https://940882164.github.io/portfolio-test-tracker2/",
-  "https://robot.labelnow.io/",
-  "https://aicc.smf.it.com/",
-  "https://labelnow.io/"
-];
+        // Filter last 24h
+        const recent = data.filter(e => {
+          const t = new Date(e.time).getTime();
+          return t >= dayAgo && t <= now;
+        });
 
-fetch("uptime-log.json")
-.then(response => response.json())
-.then(data => {
+        let results = [];
 
-  let results = [];
+        sites.forEach(url => {
+          let entries = recent.filter(e => e.site === url);
+          let total = entries.length;
+          let up = entries.filter(e => e.status === "UP").length;
+          let last = entries.length > 0 ? entries[entries.length-1].status : "UNKNOWN";
 
-  sites.forEach(url => {
-    let total = 0;
-    let up = 0;
-    let lastStatus = "DOWN";
+          let percent = total > 0 ? ((up / total) * 100).toFixed(1) : 0;
 
-    data.forEach(entry => {
-      if(entry.site === url){
-        total++;
-        if(entry.status === "UP") up++;
-        lastStatus = entry.status;
-      }
-    });
+          results.push({ url, lastStatus: last, uptimePercent: percent, up, total });
+        });
 
-    let uptimePercent = total > 0 ? ((up/total)*100).toFixed(2) : 0;
-    results.push({url, lastStatus, uptimePercent, up, total});
-  });
+        // Sort best → worst
+        results.sort((a, b) => b.uptimePercent - a.uptimePercent);
 
-  // Sort by highest uptime first
-  results.sort((a,b) => b.uptimePercent - a.uptimePercent);
+        const container = document.getElementById("dashboard");
+        container.innerHTML = "";
 
-  // Render
-  const container = document.getElementById("dashboard");
-  container.innerHTML = "";
+        if (results.length === 0) {
+          container.innerHTML = "<p>No data in the last 24 hours yet.</p>";
+          return;
+        }
 
-  results.forEach(r => {
-    let card = document.createElement("div");
-    card.className = "card";
-    card.innerHTML = `
-      <h3>${r.url}</h3>
-      <p><span class="${r.lastStatus.toLowerCase()}">${r.lastStatus}</span> | Uptime: ${r.uptimePercent}% (${r.up}/${r.total})</p>
-    `;
-    container.appendChild(card);
-  });
-});
-</script>
-
+        results.forEach(r => {
+          let card = document.createElement("div");
+          card.className = "card";
+          card.innerHTML = `
+            <h3 style="margin:0 0 12px 0; word-break:break-all;">${r.url.replace("https://", "")}</h3>
+            <p><span class="${r.lastStatus.toLowerCase()}">${r.lastStatus}</span></p>
+            <p>Uptime: <strong>${r.uptimePercent}%</strong> <span class="small">(${r.up} / ${r.total} checks)</span></p>
+          `;
+          container.appendChild(card);
+        });
+      })
+      .catch(err => {
+        document.getElementById("dashboard").innerHTML = "<p style='color:#ef4444'>Cannot load uptime-log.json</p>";
+        console.error(err);
+      });
+  </script>
 </body>
 </html>
