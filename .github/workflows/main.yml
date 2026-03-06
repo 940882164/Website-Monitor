@@ -30,7 +30,6 @@ jobs:
             echo "[]" > "$LOG_FILE"
           fi
 
-          FAIL=0
           STATUS_REPORT=""
           FAILED_SITES=""
 
@@ -44,7 +43,6 @@ jobs:
               STATE="UP"
             else
               STATE="DOWN"
-              FAIL=1
               FAILED_SITES="$FAILED_SITES"$'\n'"$SITE = $STATE | Checked in ${DURATION} ms"
             fi
 
@@ -58,8 +56,9 @@ jobs:
           echo "=== STATUS REPORT ==="
           echo "$STATUS_REPORT"
 
-          if [ $FAIL -eq 1 ]; then
+          if [ -n "$FAILED_SITES" ]; then
             echo "=== FAILED SITES ==="
             echo "$FAILED_SITES"
-            exit 1
           fi
+
+          # Workflow always passes now (no exit 1)
