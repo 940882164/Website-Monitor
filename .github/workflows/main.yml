@@ -2,22 +2,24 @@ name: Website Uptime Logger
 
 on:
   schedule:
-    - cron: "*/30 * * * *"  # every 30 minutes
+    - cron: "*/30 * * * *"   # every 30 minutes
   workflow_dispatch:
+
+permissions:
+  contents: write
 
 jobs:
   log-uptime:
     runs-on: ubuntu-latest
+
     steps:
-      - name: Checkout repository
+      - name: Checkout Repository
         uses: actions/checkout@v3
         with:
-          persist-credentials: false  # will use GITHUB_TOKEN for push
+          token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Check Website Status
-        shell: bash
         run: |
-          # List of websites to monitor
           WEBSITES=(
             "https://940882164.github.io/portfolio-test-tracker2/"
             "https://940882164.github.io/portfolio-test-tracker/"
@@ -25,52 +27,43 @@ jobs:
             "https://github.com"
           )
 
-          # Timestamp for this check
           TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
           echo "{ \"time\": \"$TIMESTAMP\"" > status.json
 
-          # Check each website
           for SITE in "${WEBSITES[@]}"; do
             STATUS=$(curl -o /dev/null -s -w "%{http_code}" --max-time 10 "$SITE" || echo 0)
+
             if [ "$STATUS" -eq 200 ]; then
-              STATUS_TEXT="UP"
+              STATE="UP"
             else
-              STATUS_TEXT="DOWN"
+              STATE="DOWN"
             fi
-            echo ", \"$SITE\": \"$STATUS_TEXT\"" >> status.json
+
+            echo ", \"$SITE\": \"$STATE\"" >> status.json
           done
 
           echo "}" >> status.json
 
-      - name: Merge with existing log
-        shell: bash
+      - name: Update Log
         run: |
           if [ ! -f uptime-log.json ]; then
             echo "[]" > uptime-log.json
           fi
-          TMP=$(mktemp)
-          jq '. + [input]' uptime-log.json status.json > "$TMP"
-          mv "$TMP" uptime-log.json
-          # Keep only last 48 entries (24 hours at 30-min intervals)
-          TMP2=$(mktemp)
-          jq '.[-48:]' uptime-log.json > "$TMP2"
-          mv "$TMP2" uptime-log.json
 
-      - name: Commit and Push log
-        shell: bash
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          jq '. + [input]' uptime-log.json status.json > temp.json
+          mv temp.json uptime-log.json
+
+          # keep only last 48 entries (24 hours)
+          jq '.[-48:]' uptime-log.json > temp.json
+          mv temp.json uptime-log.json
+
+      - name: Commit and Push
         run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git config user.name "github-actions"
+          git config user.email "actions@github.com"
 
-          # Align local branch with remote
-          git fetch origin main
-          git checkout -B main origin/main
-
-          # Add log and commit only if there are changes
           git add uptime-log.json
-          git diff-index --quiet HEAD || git commit -m "Update uptime log"
+          git commit -m "Update uptime log" || echo "No changes"
 
-          # Force push updated main branch
-          git push -f https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY} HEAD:main
+          git pull --rebase
+          git push
