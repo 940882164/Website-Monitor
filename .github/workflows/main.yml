@@ -1,8 +1,8 @@
-name: Website Uptime Monitor + Built-in Notification on Down
+name: Website Uptime Monitor + Email on Down
 
 on:
   schedule:
-    - cron: "*/30 * * * *"    # every 30 minutes
+    - cron: "*/30 * * * *"
   workflow_dispatch:
 
 jobs:
@@ -29,7 +29,6 @@ jobs:
           TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
           LOG_FILE="uptime-log.json"
 
-          # Create empty array if file doesn't exist
           if [ ! -f "$LOG_FILE" ]; then
             echo "[]" > "$LOG_FILE"
           fi
@@ -52,7 +51,6 @@ jobs:
 
             STATUS_LINES="$STATUS_LINES\n$SITE → $STATE (HTTP $HTTP_STATUS, ${DURATION}ms)"
 
-            # Append entry to JSON log
             jq --arg site "$SITE" \
                --arg status "$STATE" \
                --arg time "$TIMESTAMP" \
@@ -61,24 +59,51 @@ jobs:
                "$LOG_FILE" > tmp.json && mv tmp.json "$LOG_FILE"
           done
 
-          # Print status for logs (visible in workflow run)
           echo "Status this run:"
           echo -e "$STATUS_LINES"
 
-          # If any DOWN → fail the job so built-in email is sent
           if [ ${#FAILED_SITES[@]} -gt 0 ]; then
-            echo "ALERT: Some sites DOWN → forcing failure for notification"
-            echo "Failed: ${FAILED_SITES[*]}"
-            exit 1
+            echo "failed_sites<<EOF" >> $GITHUB_OUTPUT
+            printf "%s\n" "${FAILED_SITES[@]}" >> $GITHUB_OUTPUT
+            echo "EOF" >> $GITHUB_OUTPUT
+            echo "has_failures=true" >> $GITHUB_OUTPUT
+          else
+            echo "has_failures=false" >> $GITHUB_OUTPUT
           fi
 
-      - name: Commit and push updated log (always, even on DOWN/failure)
+      - name: Commit and push updated log (always)
         if: always()
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add uptime-log.json
-          git commit -m "Update uptime log - $(date -u +'%Y-%m-%d %H:%M UTC')" || echo "No changes to commit"
+          git commit -m "Update uptime log - $(date -u +'%Y-%m-%d %H:%M UTC')" || echo "No changes"
           git push
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Send custom email if any site DOWN
+        if: always() && steps.check.outputs.has_failures == 'true'
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: smtp.gmail.com
+          server_port: 465
+          username: ${{ secrets.GMAIL_ADDRESS }}
+          password: ${{ secrets.GMAIL_APP_PASSWORD }}
+          subject: "Website DOWN: ${{ steps.check.outputs.failed_sites }} - Uptime Monitor"
+          to: ${{ secrets.GMAIL_ADDRESS }}
+          from: Uptime Monitor <${{ secrets.GMAIL_ADDRESS }}>
+          body: |
+            🚨 Site(s) DOWN detected! 🚨
+
+            Failed:
+            ${{ steps.check.outputs.failed_sites }}
+
+            Full status:
+            ${{ steps.check.outputs.all_status }}  # add this output if you want full list
+
+            Dashboard → https://940882164.github.io/Website-Monitor/
+            Run details → $$   {{ github.server_url }}/   $${{ github.repository }}/actions/runs/${{ github.run_id }}
+
+            (Check every 30 min)
+          content_type: text/plain
