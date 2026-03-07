@@ -29,7 +29,7 @@
       <h1 class="text-4xl md:text-5xl font-extrabold tracking-tight mb-2 bg-gradient-to-r from-emerald-400 to-cyan-400 bg-clip-text text-transparent">
         Website Uptime Monitor
       </h1>
-      <p class="text-gray-400 text-lg">Real-time status • Last 24 hours • Updates every 30 min</p>
+      <p class="text-gray-400 text-lg">Real-time status • Last 24 hours • Checks every 30 min • Page refreshes every 15 min</p>
     </header>
 
     <div id="dashboard" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -40,7 +40,7 @@
   </div>
 
   <script>
-    // Global object to track chart instances
+    // Store chart instances to destroy them on refresh/re-run
     window.charts = window.charts || {};
 
     const sites = [
@@ -52,7 +52,7 @@
 
     fetch("uptime-log.json?_=" + Date.now() + "&nocache=" + Math.random())
       .then(r => {
-        if (!r.ok) throw new Error(`HTTP ${r.status}: Could not load uptime-log.json`);
+        if (!r.ok) throw new Error(`Failed to load uptime-log.json (HTTP ${r.status})`);
         return r.json();
       })
       .then(data => {
@@ -116,7 +116,7 @@
               </div>
 
               <div class="text-center">
-                <div class="text-4xl font-bold ${lastStatus === 'UP' ? 'text-emerald-400 drop-shadow-[0_0_8px_#22c55e]' : 'text-red-400 drop-shadow-[0_0_8px_#ef4444]'}">
+                <div class="text-4xl font-bold ${lastStatus === 'UP' ? 'text-up drop-shadow-[0_0_8px_#22c55e]' : 'text-down drop-shadow-[0_0_8px_#ef4444]'}">
                   ${lastStatus}
                 </div>
                 <div class="text-xs text-gray-500 mt-1">Last check</div>
@@ -134,7 +134,7 @@
 
           container.appendChild(card);
 
-          // Destroy old chart if it exists
+          // Destroy previous chart instance if it exists
           if (window.charts[canvasId]) {
             window.charts[canvasId].destroy();
             delete window.charts[canvasId];
@@ -166,7 +166,6 @@
               }
             });
 
-            // Save reference
             window.charts[canvasId] = chart;
           }
         });
@@ -177,7 +176,6 @@
             Failed to load data: ${err.message}
           </div>
         `;
-        console.error("Dashboard load error:", err);
       });
   </script>
 </body>
