@@ -139,8 +139,8 @@
             delete window.charts[canvasId];
           }
 
-          // Create chart with delay for DOM readiness
-          requestAnimationFrame(() => {
+          // Create chart with delay + fallback
+          setTimeout(() => {
             const canvas = document.getElementById(canvasId);
             const ctx = canvas?.getContext('2d');
             if (ctx) {
@@ -152,11 +152,11 @@
                     datasets: [{
                       data: statusValues.length ? statusValues : Array(5).fill(0),
                       borderColor: lastStatus === 'UP' ? '#22c55e' : '#ef4444',
-                      backgroundColor: lastStatus === 'UP' ? 'rgba(34,197,94,0.45)' : 'rgba(239,68,68,0.45)',
+                      backgroundColor: lastStatus === 'UP' ? 'rgba(34,197,94,0.55)' : 'rgba(239,68,68,0.55)',
                       fill: true,
                       tension: 0.3,
                       pointRadius: 0,
-                      borderWidth: 3.5
+                      borderWidth: 4
                     }]
                   },
                   options: {
@@ -164,27 +164,27 @@
                     maintainAspectRatio: false,
                     plugins: { legend: { display: false }, tooltip: { enabled: false } },
                     scales: { x: { display: false }, y: { min: -0.2, max: 1.2, display: false } },
-                    animation: { duration: 1400, easing: 'easeOutQuart' },
+                    animation: { duration: 1600, easing: 'easeOutQuart' },
                     elements: { line: { borderJoinStyle: 'round' } }
                   }
                 });
 
                 window.charts[canvasId] = chart;
               } catch (e) {
-                console.warn("Chart failed:", url, e);
-                canvas.outerHTML = `<div class="h-full w-full flex items-center justify-center text-xs ${lastStatus === 'UP' ? 'text-up bg-up/20' : 'text-down bg-down/20'}">
-                  Status history unavailable
+                console.warn("Chart creation failed for", url, e);
+                canvas.outerHTML = `<div class="h-full w-full flex items-center justify-center text-sm font-medium ${lastStatus === 'UP' ? 'text-up bg-up/30' : 'text-down bg-down/30'}">
+                  Status history
                 </div>`;
               }
             }
-          });
+          }, 100); // small delay for DOM paint
         });
       })
       .catch(err => {
         console.error("Dashboard error:", err);
         document.getElementById("dashboard").innerHTML = `
           <div class="col-span-full text-center py-16 text-red-400 text-xl">
-            Failed to load: ${err.message}
+            Failed to load data: ${err.message}
           </div>
         `;
       });
