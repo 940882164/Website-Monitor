@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Website Uptime Dashboard • Last 24h</title>
-  <meta http-equiv="refresh" content="900"> <!-- 15 minutes -->
+  <meta http-equiv="refresh" content="900">
 
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
@@ -40,7 +40,6 @@
   </div>
 
   <script>
-    // Store charts to destroy them later
     window.charts = window.charts || {};
 
     const sites = [
@@ -52,7 +51,7 @@
 
     fetch("uptime-log.json?_=" + Date.now() + "&nocache=" + Math.random())
       .then(r => {
-        if (!r.ok) throw new Error(`Failed to load uptime-log.json (HTTP ${r.status})`);
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
         return r.json();
       })
       .then(data => {
@@ -69,7 +68,7 @@
         container.innerHTML = "";
 
         if (recent.length === 0) {
-          container.innerHTML = `<p class="col-span-full text-center py-16 text-yellow-400 text-xl">No recent data found</p>`;
+          container.innerHTML = `<p class="col-span-full text-center py-16 text-yellow-400 text-xl">No data in last 24h</p>`;
           return;
         }
 
@@ -123,7 +122,7 @@
               </div>
             </div>
 
-            <div class="h-20 mb-4 relative">
+            <div class="h-20 mb-4 relative bg-gray-800/50 rounded overflow-hidden">
               <canvas id="${canvasId}"></canvas>
             </div>
 
@@ -134,57 +133,58 @@
 
           container.appendChild(card);
 
-          // Clean up previous chart
+          // Destroy old chart
           if (window.charts[canvasId]) {
             window.charts[canvasId].destroy();
             delete window.charts[canvasId];
           }
 
-          // Create chart with better visibility
-          const canvas = document.getElementById(canvasId);
-          const ctx = canvas?.getContext('2d');
-          if (ctx) {
-            try {
-              const chart = new Chart(ctx, {
-                type: 'line',
-                data: {
-                  labels: labels.length ? labels : Array(5).fill(''),
-                  datasets: [{
-                    data: statusValues.length ? statusValues : Array(5).fill(0),
-                    borderColor: lastStatus === 'UP' ? '#22c55e' : '#ef4444',
-                    backgroundColor: lastStatus === 'UP' ? 'rgba(34,197,94,0.35)' : 'rgba(239,68,68,0.35)',
-                    fill: true,
-                    tension: 0.3,
-                    pointRadius: 0,
-                    borderWidth: 3
-                  }]
-                },
-                options: {
-                  responsive: true,
-                  maintainAspectRatio: false,
-                  plugins: { legend: { display: false }, tooltip: { enabled: false } },
-                  scales: { x: { display: false }, y: { min: -0.2, max: 1.2, display: false } },
-                  animation: { duration: 1400, easing: 'easeOutQuart' },
-                  elements: { line: { borderJoinStyle: 'round' } }
-                }
-              });
+          // Create chart with delay for DOM readiness
+          requestAnimationFrame(() => {
+            const canvas = document.getElementById(canvasId);
+            const ctx = canvas?.getContext('2d');
+            if (ctx) {
+              try {
+                const chart = new Chart(ctx, {
+                  type: 'line',
+                  data: {
+                    labels: labels.length ? labels : Array(5).fill(''),
+                    datasets: [{
+                      data: statusValues.length ? statusValues : Array(5).fill(0),
+                      borderColor: lastStatus === 'UP' ? '#22c55e' : '#ef4444',
+                      backgroundColor: lastStatus === 'UP' ? 'rgba(34,197,94,0.45)' : 'rgba(239,68,68,0.45)',
+                      fill: true,
+                      tension: 0.3,
+                      pointRadius: 0,
+                      borderWidth: 3.5
+                    }]
+                  },
+                  options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false }, tooltip: { enabled: false } },
+                    scales: { x: { display: false }, y: { min: -0.2, max: 1.2, display: false } },
+                    animation: { duration: 1400, easing: 'easeOutQuart' },
+                    elements: { line: { borderJoinStyle: 'round' } }
+                  }
+                });
 
-              window.charts[canvasId] = chart;
-            } catch (e) {
-              console.warn("Chart failed for", url, e);
-              canvas.outerHTML = '<div class="h-full w-full bg-gray-700/50 flex items-center justify-center text-xs text-gray-400">Bar unavailable</div>';
+                window.charts[canvasId] = chart;
+              } catch (e) {
+                console.warn("Chart failed:", url, e);
+                canvas.outerHTML = `<div class="h-full w-full flex items-center justify-center text-xs ${lastStatus === 'UP' ? 'text-up bg-up/20' : 'text-down bg-down/20'}">
+                  Status history unavailable
+                </div>`;
+              }
             }
-          }
+          });
         });
       })
       .catch(err => {
-        console.error("Fetch or render error:", err);
+        console.error("Dashboard error:", err);
         document.getElementById("dashboard").innerHTML = `
           <div class="col-span-full text-center py-16 text-red-400 text-xl">
-            Failed to load data: ${err.message}<br>
-            <span class="text-sm mt-4 block text-gray-400">
-              Try refreshing (Ctrl+Shift+R) or check console (F12)
-            </span>
+            Failed to load: ${err.message}
           </div>
         `;
       });
