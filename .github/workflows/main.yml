@@ -2,13 +2,12 @@ name: Website Monitor Multiple
 
 on:
   schedule:
-    - cron: "*/15 * * * *"   # every 30 minutes
+    - cron: "*/15 * * * *"   # Every 15 minutes
   workflow_dispatch:
 
 jobs:
   monitor-and-log:
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -52,7 +51,6 @@ jobs:
               echo "❌ $SITE → DOWN (HTTP $HTTP_STATUS, ${DURATION}ms)"
             fi
 
-            # Append to JSON
             jq --arg site "$SITE" \
                --arg status "$STATE" \
                --arg time "$TIMESTAMP" \
@@ -61,12 +59,10 @@ jobs:
                "$LOG_FILE" > tmp.json && mv tmp.json "$LOG_FILE"
           done
 
-          # Set output for potential use (visible in logs)
           echo "failed_sites<<EOF" >> $GITHUB_OUTPUT
           echo -e "$FAILED_SITES" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
 
-          # Force failure if any DOWN → triggers built-in email
           if [ "$ANY_DOWN" = true ]; then
             echo ""
             echo "======================================"
@@ -77,7 +73,7 @@ jobs:
             exit 1
           fi
 
-      - name: Commit and push log (always runs, even after failure)
+      - name: Commit and push log (always)
         if: always()
         run: |
           git config user.name "github-actions[bot]"
