@@ -38,7 +38,7 @@
       </div>
     </div>
 
-    <!-- Advanced Charts - Only two as requested -->
+    <!-- Advanced Charts -->
     <div id="advanced-charts" class="grid grid-cols-1 lg:grid-cols-2 gap-6">
       <!-- Response Time Trends -->
       <div class="bg-gray-800/70 backdrop-blur-md border border-gray-700/60 rounded-xl p-4 shadow-xl">
@@ -48,7 +48,7 @@
         </div>
       </div>
 
-      <!-- Uptime % Last 7 Days - REAL calculation -->
+      <!-- Uptime % Last 7 Days - REAL -->
       <div class="bg-gray-800/70 backdrop-blur-md border border-gray-700/60 rounded-xl p-4 shadow-xl">
         <h3 class="text-base font-semibold mb-2 text-center">Uptime % (Last 7 Days)</h3>
         <div class="h-52 md:h-60">
@@ -82,6 +82,12 @@
           return !isNaN(t) && t >= dayAgo && t <= now;
         });
 
+        const lastWeek = data.filter(e => {
+          if (!e?.time) return false;
+          const t = new Date(e.time).getTime();
+          return !isNaN(t) && t >= weekAgo && t <= now;
+        });
+
         const container = document.getElementById("dashboard");
         container.innerHTML = "";
 
@@ -90,7 +96,7 @@
           return;
         }
 
-        // Smaller main cards - no progress bar, compact
+        // Compact main cards (no progress bar)
         sites.forEach(url => {
           const entries = recent.filter(e => e.site === url);
           const total = entries.length;
@@ -174,20 +180,20 @@
           });
         }
 
-        // Uptime % Last 7 Days - REAL calculation
+        // Real Uptime % Last 7 Days
         const uptime7daysCtx = document.getElementById("uptime-7days-chart")?.getContext('2d');
         if (uptime7daysCtx) {
           const uptimeByDay = {};
 
-          // Initialize last 7 days + today
-          for (let i = 0; i < 8; i++) { // 0 = today, 7 = 7 days ago
+          // Initialize last 7 full days + today
+          for (let i = 0; i <= 7; i++) {
             const dayStart = new Date(now - i * 24 * 60 * 60 * 1000);
             dayStart.setHours(0, 0, 0, 0);
             const dayKey = dayStart.toISOString().split('T')[0];
             uptimeByDay[dayKey] = { total: 0, up: 0 };
           }
 
-          // Aggregate by day
+          // Aggregate uptime by day
           lastWeek.forEach(e => {
             const day = new Date(e.time).toISOString().split('T')[0];
             if (uptimeByDay[day]) {
@@ -196,17 +202,18 @@
             }
           });
 
-          // Prepare chart data (reverse order: oldest → today)
-          const days = Object.keys(uptimeByDay).sort().reverse();
+          // Prepare chart data (oldest to newest)
+          const days = Object.keys(uptimeByDay).sort();
           const uptimeDays = days.map(day => {
             const { total, up } = uptimeByDay[day];
-            return total > 0 ? (up / total) * 100 : 100; // no checks = 100% (or change to 0)
+            return total > 0 ? (up / total) * 100 : 100; // No checks = 100% (change to 0 if preferred)
           });
 
           const dayLabels = days.map((day, i) => {
-            if (i === 0) return "Today";
-            if (i === 1) return "Yesterday";
-            return `${i} days ago`;
+            const diff = Math.round((now - new Date(day).getTime()) / (24 * 60 * 60 * 1000));
+            if (diff === 0) return "Today";
+            if (diff === 1) return "Yesterday";
+            return `${diff} days ago`;
           });
 
           new Chart(uptime7daysCtx, {
