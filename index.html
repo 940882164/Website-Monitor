@@ -25,35 +25,41 @@
 </head>
 <body class="min-h-screen bg-gradient-to-br from-gray-950 via-slate-950 to-gray-900 p-4 md:p-6 font-sans antialiased">
   <div class="max-w-7xl mx-auto">
-    <header class="text-center mb-6 md:mb-8">
+    <header class="text-center mb-6">
       <h1 class="text-3xl md:text-5xl font-extrabold tracking-tight mb-2 bg-gradient-to-r from-emerald-400 to-cyan-400 bg-clip-text text-transparent">
         Website Uptime Monitor
       </h1>
       <p class="text-gray-400 text-base md:text-lg">Real-time status • Last 24 hours • Page refreshes every 15 min</p>
     </header>
 
-    <div class="grid grid-cols-1 lg:grid-cols-5 gap-4 md:gap-6">
-      <!-- Main cards (left side or top on mobile) - size unchanged -->
-      <div id="dashboard" class="lg:col-span-3 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 gap-4 md:gap-6">
-        <div class="col-span-full text-center py-12 text-gray-500 text-lg animate-pulse">
-          Loading dashboard data...
-        </div>
+    <!-- First row: 4 websites -->
+    <div id="dashboard" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6 mb-6">
+      <div class="col-span-full text-center py-10 text-gray-500 text-lg animate-pulse">
+        Loading dashboard data...
+      </div>
+    </div>
+
+    <!-- Second row: 5th website + two charts (side by side, reduced size) -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-6">
+      <!-- 5th website card (calendar-me.com) - size same as others -->
+      <div id="fifth-card-placeholder" class="lg:col-span-1">
+        <!-- Dynamically filled by JS below -->
       </div>
 
-      <!-- Charts moved up and beside cards (right side on desktop) - smaller -->
-      <div id="advanced-charts" class="lg:col-span-2 grid grid-cols-1 gap-4 md:gap-6">
-        <!-- Response Time Trends - reduced size -->
+      <!-- Charts - smaller boundaries and inner size -->
+      <div class="lg:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
+        <!-- Response Time Trends - smaller -->
         <div class="bg-gray-800/70 backdrop-blur-md border border-gray-700/60 rounded-xl p-4 shadow-xl">
           <h3 class="text-base font-semibold mb-2 text-center">Response Time Trends (Last 24h)</h3>
-          <div class="h-40 md:h-48">
+          <div class="h-40 md:h-44">
             <canvas id="response-trend-chart"></canvas>
           </div>
         </div>
 
-        <!-- Uptime % Last 7 Days - reduced size, fixed to 7 days only -->
+        <!-- Uptime % Last 7 Days - smaller, fixed to 7 days -->
         <div class="bg-gray-800/70 backdrop-blur-md border border-gray-700/60 rounded-xl p-4 shadow-xl">
           <h3 class="text-base font-semibold mb-2 text-center">Uptime % (Last 7 Days)</h3>
-          <div class="h-40 md:h-48">
+          <div class="h-40 md:h-44">
             <canvas id="uptime-7days-chart"></canvas>
           </div>
         </div>
@@ -100,8 +106,8 @@
           return;
         }
 
-        // Main cards - size unchanged from your screenshot
-        sites.forEach(url => {
+        // Main cards - first 4 in first row
+        sites.slice(0, 4).forEach(url => {
           const entries = recent.filter(e => e.site === url);
           const total = entries.length;
           const upCount = entries.filter(e => e.status === "UP").length;
@@ -148,6 +154,53 @@
           container.appendChild(card);
         });
 
+        // 5th card (calendar-me.com) - same size, placed in second row left
+        const fifthUrl = sites[4];
+        const fifthEntries = recent.filter(e => e.site === fifthUrl);
+        const fifthTotal = fifthEntries.length;
+        const fifthUp = fifthEntries.filter(e => e.status === "UP").length;
+        const fifthUptime = fifthTotal > 0 ? (fifthUp / fifthTotal) * 100 : 0;
+        const fifthStatus = fifthTotal > 0 ? fifthEntries[fifthEntries.length - 1].status : "UNKNOWN";
+        const fifthAvg = fifthTotal > 0 ? Math.round(fifthEntries.reduce((s, e) => s + (Number(e.duration_ms) || 0), 0) / fifthTotal) : '—';
+
+        const fifthCard = document.createElement("div");
+        fifthCard.className = `
+          bg-gray-800/70 backdrop-blur-md border border-gray-700/60 rounded-2xl p-5 md:p-6 shadow-xl text-center
+          hover:shadow-emerald-500/20 hover:border-emerald-500/40 transition-all duration-300
+        `;
+
+        fifthCard.innerHTML = `
+          <h3 class="text-lg md:text-xl font-semibold mb-4 truncate" title="${fifthUrl}">
+            ${fifthUrl.replace(/^https?:\/\//, '').replace(/^www\./, '')}
+          </h3>
+
+          <div class="relative w-28 h-28 md:w-32 md:h-32 mx-auto mb-4">
+            <svg class="w-full h-full" viewBox="0 0 120 120">
+              <circle cx="60" cy="60" r="54" fill="none" stroke="#1f2937" stroke-width="10" />
+              <circle cx="60" cy="60" r="54" fill="none" 
+                stroke="${fifthStatus === 'UP' ? '#22c55e' : '#ef4444'}"
+                stroke-width="10" 
+                stroke-dasharray="339" 
+                stroke-dashoffset="${339 - (339 * fifthUptime / 100)}"
+                stroke-linecap="round" />
+            </svg>
+            <div class="absolute inset-0 flex flex-col items-center justify-center">
+              <div class="text-3xl md:text-4xl font-bold">${Math.round(fifthUptime)}</div>
+              <div class="text-sm text-gray-400">%</div>
+            </div>
+          </div>
+
+          <div class="text-3xl md:text-4xl font-bold ${fifthStatus === 'UP' ? 'text-up drop-shadow-[0_0_8px_#22c55e]' : 'text-down drop-shadow-[0_0_8px_#ef4444]'}">
+            ${fifthStatus}
+          </div>
+
+          <div class="text-sm md:text-base text-gray-400 mt-2">
+            ${fifthUp} / ${fifthTotal} • Avg: ${fifthAvg} ms
+          </div>
+        `;
+
+        document.getElementById("fifth-card-placeholder").appendChild(fifthCard);
+
         // Response Time Trends - smaller
         const responseCtx = document.getElementById("response-trend-chart")?.getContext('2d');
         if (responseCtx) {
@@ -184,12 +237,12 @@
           });
         }
 
-        // Uptime % Last 7 Days - strictly 7 days + today, no 8 days ago
+        // Uptime % Last 7 Days - strictly 7 days + today
         const uptime7daysCtx = document.getElementById("uptime-7days-chart")?.getContext('2d');
         if (uptime7daysCtx) {
           const uptimeByDay = {};
 
-          // Initialize only today + last 7 days (8 slots, but labels stop at 7 days ago)
+          // Initialize only today + last 7 days
           for (let i = 0; i <= 7; i++) {
             const dayStart = new Date(now - i * 24 * 60 * 60 * 1000);
             dayStart.setHours(0, 0, 0, 0);
@@ -205,15 +258,15 @@
             }
           });
 
-          const days = Object.keys(uptimeByDay).sort().reverse().slice(0, 8); // newest first
+          const days = Object.keys(uptimeByDay).sort().reverse().slice(0, 8);
           const uptimeDays = days.map(day => {
             const { total, up } = uptimeByDay[day];
             return total > 0 ? (up / total) * 100 : 100;
-          }).reverse(); // oldest left
+          }).reverse();
 
           const dayLabels = days.reverse().map((day, i) => {
             const diff = Math.round((now - new Date(day).getTime()) / (24 * 60 * 60 * 1000));
-            if (diff > 7) return ''; // safety, though slice prevents it
+            if (diff > 7) return ''; // prevent older
             if (diff === 0) return "Today";
             if (diff === 1) return "Yesterday";
             return `${diff} days ago`;
