@@ -23,6 +23,7 @@ jobs:
             "https://robot.labelnow.io/"
             "https://aicc.smf.it.com/"
             "https://labelnow.io/"
+            "https://calendar-me.com/"   # ← added here
           )
 
           TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
