@@ -25,33 +25,33 @@
 </head>
 <body class="min-h-screen bg-gradient-to-br from-gray-950 via-slate-950 to-gray-900 p-4 md:p-6 font-sans antialiased">
   <div class="max-w-7xl mx-auto">
-    <header class="text-center mb-8 md:mb-10">
+    <header class="text-center mb-8">
       <h1 class="text-3xl md:text-5xl font-extrabold tracking-tight mb-2 bg-gradient-to-r from-emerald-400 to-cyan-400 bg-clip-text text-transparent">
         Website Uptime Monitor
       </h1>
       <p class="text-gray-400 text-base md:text-lg">Real-time status • Last 24 hours • Page refreshes every 15 min</p>
     </header>
 
-    <div id="dashboard" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6 mb-10 md:mb-12">
+    <div id="dashboard" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6 mb-10">
       <div class="col-span-full text-center py-12 text-gray-500 text-lg animate-pulse">
         Loading dashboard data...
       </div>
     </div>
 
-    <!-- Advanced Charts -->
+    <!-- Advanced Charts (smaller) -->
     <div id="advanced-charts" class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-      <!-- Response Time Trends -->
-      <div class="bg-gray-800/70 backdrop-blur-md border border-gray-700/60 rounded-xl p-5 shadow-xl">
-        <h3 class="text-lg font-semibold mb-3 text-center">Response Time Trends (Last 24h)</h3>
-        <div class="h-60 md:h-72">
+      <!-- Response Time Trends (smaller height) -->
+      <div class="bg-gray-800/70 backdrop-blur-md border border-gray-700/60 rounded-xl p-4 shadow-xl">
+        <h3 class="text-base font-semibold mb-2 text-center">Response Time Trends (Last 24h)</h3>
+        <div class="h-40 md:h-48">
           <canvas id="response-trend-chart"></canvas>
         </div>
       </div>
 
-      <!-- Uptime % Last 7 Days - REAL -->
-      <div class="bg-gray-800/70 backdrop-blur-md border border-gray-700/60 rounded-xl p-5 shadow-xl">
-        <h3 class="text-lg font-semibold mb-3 text-center">Uptime % (Last 7 Days)</h3>
-        <div class="h-60 md:h-72">
+      <!-- Uptime % Last 7 Days (smaller height, real 7 days only) -->
+      <div class="bg-gray-800/70 backdrop-blur-md border border-gray-700/60 rounded-xl p-4 shadow-xl">
+        <h3 class="text-base font-semibold mb-2 text-center">Uptime % (Last 7 Days)</h3>
+        <div class="h-40 md:h-48">
           <canvas id="uptime-7days-chart"></canvas>
         </div>
       </div>
@@ -63,7 +63,8 @@
       "https://auapp.app/",
       "https://robot.labelnow.io/",
       "https://aicc.smf.it.com/",
-      "https://labelnow.io/"
+      "https://labelnow.io/",
+      "https://calendar-me.com/"   // ← added here
     ];
 
     fetch("uptime-log.json?_=" + Date.now() + "&nocache=" + Math.random())
@@ -96,7 +97,7 @@
           return;
         }
 
-        // Slightly bigger main cards (no progress bar)
+        // Main cards (size unchanged from your last liked version)
         sites.forEach(url => {
           const entries = recent.filter(e => e.site === url);
           const total = entries.length;
@@ -180,12 +181,12 @@
           });
         }
 
-        // Real Uptime % Last 7 Days
+        // Real Uptime % - Last 7 days only (excluding 8 days ago)
         const uptime7daysCtx = document.getElementById("uptime-7days-chart")?.getContext('2d');
         if (uptime7daysCtx) {
           const uptimeByDay = {};
 
-          // Initialize last 7 full days + today
+          // Only last 7 days + today (8 slots total, but label excludes "8 days ago")
           for (let i = 0; i <= 7; i++) {
             const dayStart = new Date(now - i * 24 * 60 * 60 * 1000);
             dayStart.setHours(0, 0, 0, 0);
@@ -193,7 +194,6 @@
             uptimeByDay[dayKey] = { total: 0, up: 0 };
           }
 
-          // Aggregate uptime by day
           lastWeek.forEach(e => {
             const day = new Date(e.time).toISOString().split('T')[0];
             if (uptimeByDay[day]) {
@@ -202,19 +202,18 @@
             }
           });
 
-          // Prepare chart data (oldest to newest)
-          const days = Object.keys(uptimeByDay).sort();
-          const uptimeDays = days.map(day => {
+          const days = Object.keys(uptimeByDay).sort().reverse(); // newest first
+          const uptimeDays = days.slice(0, 8).map(day => { // limit to 7 + today
             const { total, up } = uptimeByDay[day];
-            return total > 0 ? (up / total) * 100 : 100; // No checks = 100% (change to 0 if preferred)
-          });
+            return total > 0 ? (up / total) * 100 : 100; // No checks = 100%
+          }).reverse(); // oldest left, today right
 
-          const dayLabels = days.map((day, i) => {
+          const dayLabels = days.slice(0, 8).map((day, i) => {
             const diff = Math.round((now - new Date(day).getTime()) / (24 * 60 * 60 * 1000));
             if (diff === 0) return "Today";
             if (diff === 1) return "Yesterday";
             return `${diff} days ago`;
-          });
+          }).reverse();
 
           new Chart(uptime7daysCtx, {
             type: 'bar',
