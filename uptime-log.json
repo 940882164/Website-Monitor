@@ -14518,5 +14518,35 @@
     "status": "UP",
     "time": "2026-08-22T22:58:01Z",
     "duration_ms": 156
+  },
+  {
+    "site": "https://auapp.app/",
+    "status": "DOWN",
+    "time": "2026-08-22T23:25:52Z",
+    "duration_ms": 123
+  },
+  {
+    "site": "https://robot.labelnow.io/",
+    "status": "UP",
+    "time": "2026-08-22T23:25:52Z",
+    "duration_ms": 174
+  },
+  {
+    "site": "https://aicc.smf.it.com/",
+    "status": "UP",
+    "time": "2026-08-22T23:25:52Z",
+    "duration_ms": 1358
+  },
+  {
+    "site": "https://labelnow.io/",
+    "status": "UP",
+    "time": "2026-08-22T23:25:52Z",
+    "duration_ms": 347
+  },
+  {
+    "site": "https://calendar-me.com/",
+    "status": "UP",
+    "time": "2026-08-22T23:25:52Z",
+    "duration_ms": 202
   }
 ]
